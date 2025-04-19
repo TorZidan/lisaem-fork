@@ -1210,8 +1210,8 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         DEBUG_LOG(0, "writing %02x to register %d (%s)", xvalue, (addr - VIA1BASE) / 2, via_regname((addr - VIA1BASE) / 2));
     }
 #endif
-
-    switch (addr & 0x1f)
+    uint8 port = addr & 0x1f;
+    switch (port)
     {
     case ORB1:
         /* It is possible to write multiple bytes by writing different
@@ -1224,6 +1224,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
 
         DEBUG_LOG(0, "ORB1");
         via[1].via[ORB] = xvalue;
+        via[1].last_port = port;
         DEBUG_LOG(0, "VIA1 ORB(NH)=%02x", via[1].via[ORB]); // set the register to the unmasked data for later use.
         if (!via[1].via[DDRB])
             return;                                   // don't write anything if the DDRA is all inputs
@@ -1234,6 +1235,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         via[1].last_a_accs = 1;
         DEBUG_LOG(0, "ORANH1");
         via[1].via[ORAA] = xvalue;
+        via[1].last_port = port;
         via[1].via[ORA] = (via[1].via[IRAA] & (~via[1].via[DDRA])) | (via[1].via[ORAA] & via[1].via[DDRA]);
         DEBUG_LOG(0, "VIA1 ORA(NH)=%02x DDRA=%02x", via[1].via[ORA], via[1].via[DDRA]);
         if (!via[1].via[DDRA])
@@ -1246,11 +1248,20 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
 
     case ORA1:
         via[1].last_a_accs = 1;
+
+        if (via[1].via[ORA] == xvalue && via[1].last_port == ORANH2)
+        {
+            DEBUG_LOG(0, "in ORA1: Already wrote %02x to ORANH1, not pushing it again.\n", xvalue);
+            via[1].last_port = port;
+            return; // already what's on the port, ignore the write
+        }
+
         VIA_CLEAR_IRQ_PORT_A(1); // clear CA1/CA2 on ORA/IRA access
 
         DEBUG_LOG(0, "ORA1");
         via[1].via[ORA] = (via[1].via[IRAA] & (~via[1].via[DDRA])) | (via[1].via[ORAA] & via[1].via[DDRA]);
         via[1].via[ORA] = xvalue;
+        via[1].last_port = port;
         if (!via[1].via[DDRA])
         {
             via[1].orapending = 1;
@@ -1271,6 +1282,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         }
         else
             via[1].via[DDRB] = xvalue;
+        via[1].last_port = port;
 
         return;
 
@@ -1278,6 +1290,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         DEBUG_LOG(0, "DDRA1");
 
         via[1].via[DDRA] = xvalue;
+        via[1].last_port = port;
         if (via[1].orapending && xvalue != 0)           // only try to write if this mask changed and last access to A was a write
             via1_ora((via[1].via[ORAA] & xvalue), ORA); // output the masked data
         return;
@@ -1302,6 +1315,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         via[1].via[T1CL] = xvalue; // 4 T1LC actually writes to T1LL only
         via[1].via[T1LL] = xvalue;
         via[1].t1_e = get_via_te_from_timer((via[1].via[T1LH] << 8) | via[1].via[T1LL]);
+        via[1].last_port = port;
 
         FIX_CLKSTOP_VIA_T1(1); // update cpu68k_clocks_stop if needed
 
@@ -1317,6 +1331,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
     case T1LH1:
         DEBUG_LOG(0, "T1LH1");       // 7 T1HL value copied into T1HL, no transfer to T1CH
         via[1].via[T1LH] = (xvalue); // Set timer1 latch and counter
+        via[1].last_port = port;
         via_running = 1;
 
         VIA_CLEAR_IRQ_T1(1); // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
@@ -1336,6 +1351,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
     case T1CL1: // 4 T1LC actually writes to T1LL only
         DEBUG_LOG(0, "T1CL1");
         via[1].via[T1LL] = xvalue;
+        via[1].last_port = port;
 
         via_running = 1;
 
@@ -1353,6 +1369,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         via[1].via[T1LH] = xvalue;   // load into register
         via[1].via[T1CH] = via[1].via[T1LH];
         via[1].via[T1CL] = via[1].via[T1LL]; // 5 T1HC actually writes to T1HL + copies T1LL->T1CL, T1LH->T1CH
+        via[1].last_port = port;
 
         via[1].t1_e = get_via_te_from_timer((via[1].via[T1CH] << 8) | via[1].via[T1LL]); // this one does tell the counter to count down!
         FIX_CLKSTOP_VIA_T1(1);                                                           // update cpu68k_clocks_stop if needed
@@ -1372,6 +1389,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
     case T2CL1: // Set Timer 2 Low Latch
         DEBUG_LOG(0, "T2CL1");
         via[1].via[T2LL] = xvalue; // Set t2 latch low
+        via[1].last_port = port;
 
         // #ifdef DEBUG
         via[1].t2_set_cpuclk = cpu68k_clocks;
@@ -1389,6 +1407,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         via[1].via[T2LH] = xvalue; // Set t2 latch high
         via[1].via[T2CH] = xvalue;
         via[1].via[T2CL] = via[1].via[T2LL]; // load the counter with latches
+        via[1].last_port = port;
 
         VIA_CLEAR_IRQ_T2(1);                                                             // clear T2 irq on T1 read low or write high
         via[1].t2_e = get_via_te_from_timer((via[1].via[T2LH] << 8) | via[1].via[T2CL]); // set timer expiration
@@ -1413,6 +1432,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
 
         DEBUG_LOG(0, "SR1");
         via[1].via[SHIFTREG] = xvalue; // write shift register
+        via[1].last_port = port;
         via_running = 1;
         via[1].srcount = 0;
         VIA_CLEAR_IRQ_SR(1); // clear SR irq on SR access
@@ -1486,6 +1506,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         }
 #endif
         via[1].via[ACR] = xvalue;
+        via[1].last_port = port;
         chk_sound_play();
         return;
 
@@ -1552,10 +1573,12 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         if ((via[1].via[PCR] ^ xvalue) & 1)
             via[1].via[IFR] |= VIA_IRQ_BIT_CA1;
         via[1].via[PCR] = xvalue;
+        via[1].last_port = port;
         return;
 
     case IFR1:                                       /* IFR  */
         via[1].via[IFR] &= (0x7f ^ (xvalue & 0x7f)); // 1 writes to IFR are used to clear bits!
+        via[1].last_port = port;
         FIX_VIA_IFR(1);
 
         DEBUG_LOG(0, "VIA1 IFR Write:%02x::%s %s %s %s %s %s %s %s\n", xvalue,
@@ -1579,6 +1602,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
             via[1].via[IER] |= xvalue;
         else
             via[1].via[IER] &= (0x7f ^ (xvalue & 0x7f));
+        via[1].last_port = port;
 
         DEBUG_LOG(0, "VIA1 IER Write:%02x::%s %s %s %s %s %s %s %s\n", xvalue,
                   (xvalue & VIA_IRQ_BIT_CA2) ? "CA2" : "",
@@ -1616,7 +1640,8 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
     DEBUG_LOG(0, "reading from register %d (%s)", ((addr & 0x1f) >> 1), via_regname(((addr & 0x1f) >> 1)));
 
-    switch (addr & 0x1f)
+    uint8 port = addr & 0x1f;
+    switch (port)
     {
     case IRB1:
         VIA_CLEAR_IRQ_PORT_B(1);
@@ -1626,6 +1651,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
         // now =        input shadow       input enabled bits       |  output shadow       output enabled bits
         via[1].via[IRB] = (via[1].via[IRBB] & (0xff ^ via[1].via[DDRB])) | (via[1].via[ORBB] & via[1].via[DDRB]);
+        via[1].last_port = port;
 
         return via[1].via[IRB];
 
@@ -1638,6 +1664,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
         // now =        input shadow        input enabled bits       |  output shadow      output enabled bits
         via[1].via[IRA] = (via[1].via[IRAA] & (~via[1].via[DDRA])) | (via[1].via[ORAA] & via[1].via[DDRA]); // read data from port base it on DDRA mask
+        via[1].last_port = port;
         // if needed insert code to not do handshaking here
         return via[1].via[IRA];
 
@@ -1648,23 +1675,28 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
         via[1].via[IRAA] = via1_ira(15);                                                                    // read full byte into shadow
         via[1].via[IRA] = (via[1].via[IRAA] & (~via[1].via[DDRA])) | (via[1].via[ORAA] & via[1].via[DDRA]); // read data from port base it on DDRA mask
+        via[1].last_port = port;
         return via[1].via[IRA];
 
     case DDRB1:
         DEBUG_LOG(0, "DDRB1");
+        via[1].last_port = port;
         return via[1].via[DDRB]; // DDRB
     case DDRA1:
         DEBUG_LOG(0, "DDRA1");
+        via[1].last_port = port;
         return via[1].via[DDRA]; // DDRA
 
     case T1LL1: // Timer 1 Low Order Latch
         DEBUG_LOG(0, "T1LL1");
         VIA_CLEAR_IRQ_T1(1); // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+        via[1].last_port = port;
 
         return (via[1].via[T1LL]);
 
     case T1LH1: // Time 1 High Order Latch
         DEBUG_LOG(0, "T1LH1");
+        via[1].last_port = port;
         return via[1].via[T1LH];
 
     case T1CL1: // Timer 1 Low Order Counter
@@ -1673,18 +1705,21 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
         // via[1].via[T1CL]=get_via_timer_left_from_te(via[1].t1_e) & 0xff;
 
         via[1].via[T1CL] = get_via_timer_left_or_passed_from_te(via[1].t1_e, via[1].t1_set_cpuclk) & 0xff;
+        via[1].last_port = port;
         return via[1].via[T1CL];
 
     case T1CH1: // Timer 1 High Order Counter
         DEBUG_LOG(0, "T1CH1");
         VIA_CLEAR_IRQ_T1(1); // clear timer 1 interrupt on access
         via[1].via[T1CH] = get_via_timer_left_or_passed_from_te(via[1].t1_e, via[1].t1_set_cpuclk) >> 8;
+        via[1].last_port = port;
         return via[1].via[T1CH];
 
     case T2CL1: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL1 t2_e:%ld set at:%ld", via[1].t2_e, via[1].t2_set_cpuclk);
 
         via[1].via[T2CL] = get_via_timer_left_or_passed_from_te(via[1].t2_e, via[1].t2_set_cpuclk) & 0xff;
+        via[1].last_port = port;
 
         // via[1].via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
         VIA_CLEAR_IRQ_T2(1); // clear T2 irq on T1 read low or write high
@@ -1694,18 +1729,22 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
     case T2CH1:
         DEBUG_LOG(0, "T2CH1");
         via[1].via[T2CH] = get_via_timer_left_or_passed_from_te(via[1].t2_e, via[1].t2_set_cpuclk) >> 8;
+        via[1].last_port = port;
         return via[1].via[T2CH];
 
     case SR1:
         VIA_CLEAR_IRQ_SR(1); // clear SR irq on SR access
         DEBUG_LOG(0, "SR1");
+        via[1].last_port = port;
         return via[1].via[SHIFTREG];
 
     case ACR1:
         DEBUG_LOG(0, "ACR1");
+        via[1].last_port = port;
         return via[1].via[ACR];
     case PCR1:
         DEBUG_LOG(0, "PCR1");
+        via[1].last_port = port;
         return via[1].via[PCR];
 
     case IFR1:
@@ -1716,6 +1755,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
             via[1].via[IFR] |= VIA_IRQ_BIT_CA1;
         else
             via[1].via[IFR] &= ~VIA_IRQ_BIT_CA1;
+        via[1].last_port = port;
 
 #ifdef DEBUG
         DEBUG_LOG(0, "COPS-IFR SRC: returning %02x, copsqueuelen:%d, mousequeuelen:%d", via[1].via[IFR], copsqueuelen, mousequeuelen);
@@ -1749,6 +1789,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
                       (via[1].via[IER] & VIA_IRQ_BIT_SET_CLR_ANY) ? "ANY:on" : "ANY:off");
 
         via[1].via[IER] |= 0x80; // docs says bit 7 is always logical 1
+        via[1].last_port = port;
         return via[1].via[IER];
 
     default:
@@ -1771,7 +1812,8 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
     DEBUG_LOG(0, "writing %02x to register %d (%s) @%08x", xvalue, (addr & 0x79) / 8, via_regname((addr & 0x79) / 8), addr);
 #endif
 
-    switch (addr & 0x79) // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
+    uint8 port = addr & 0x79; // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
+    switch (port)
     {
     case ORB2: // IRB/ORB
     {
@@ -1816,6 +1858,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         via[2].via[ORBB] = xvalue; // set the shadow register to the unmasked data for later use.
         via[2].via[ORB] = (via[2].via[IRBB] & (~via[2].via[DDRB])) | (via[2].via[ORBB] & via[2].via[DDRB]);
+        via[2].last_port = port;
 
         VIA_CLEAR_IRQ_PORT_B(2); // clear Cb1/Cb2 on ORb/IRb access
 
@@ -1832,13 +1875,17 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         if (via[2].ProFile)
             via[2].ProFile->last_a_accs = 1;
 
-        if (via[2].via[ORA] == xvalue)
-        {
-            DEBUG_LOG(0, "ORANH2: Already wrote %02 to port, not pushing it", xvalue);
-            return; // already what's on the port, ignore the write //20060418
-        }
+        // Note (TorZidan@): I commented out this code as I think it's wrong (it belongs in the "case ORA2" below).
+        // Once we confirm that things are running smoothly, we can remove this. See more in the docs for variable "last_port".
+        // if (via[2].via[ORA] == xvalue)
+        // {
+        //     DEBUG_LOG(0, "ORANH2: Already wrote %02 to port, not pushing it", xvalue);
+        //     return; // already what's on the port, ignore the write //20060418
+        // }
+
         via[2].via[ORAA] = xvalue; // set the shadow register to the unmasked data for later use.
         via[2].via[ORA] = (via[2].via[IRAA] & (~via[2].via[DDRA])) | (via[2].via[ORAA] & via[2].via[DDRA]);
+        via[2].last_port = port;
 
         if (!via[2].via[DDRA])
         { // don't write anything if the DDRA is all inputs
@@ -1857,11 +1904,20 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         via[2].last_a_accs = 1;
         if (via[2].ProFile)
             via[2].ProFile->last_a_accs = 1;
+
+        if (via[2].via[ORA] == xvalue && via[2].last_port == ORANH2)
+        {
+            DEBUG_LOG(0, "in ORA2: Already wrote %02x to ORANH2, not pushing it again.\n", xvalue);
+            via[2].last_port = port;
+            return; // already what's on the port, ignore the write
+        }
+
         VIA_CLEAR_IRQ_PORT_A(2); // clear CA1/CA2 on ORA/IRA access
 
         via[2].via[ORA] = (via[2].via[IRAA] & (~via[2].via[DDRA])) | (via[2].via[ORAA] & via[2].via[DDRA]);
 
         via[2].via[ORAA] = xvalue;
+        via[2].last_port = port;
 
         if (!via[2].via[DDRA])
         { // don't write anything if the DDRA is all inputs
@@ -1889,6 +1945,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         if (xvalue)                                        // only try the write if the mask has changed
             via2_orb(via[2].via[ORBB] & via[2].via[DDRB]); // output the data that was masked off
+        via[2].last_port = port;
         return;
 
     case DDRA2: // and DDRA 3 registers
@@ -1897,6 +1954,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
                   via[2].via[DDRA], xvalue);
 
         via[2].via[DDRA] = xvalue;
+        via[2].last_port = port;
 
         DEBUG_LOG(0, "Wrote DDRA mask=%02x:(%s%s%s%s%s%s%s%s)", via[2].via[DDRA],
                   ((via[2].via[DDRA] & 1) ? "PA0:out " : "pb0:in  "),
@@ -1925,6 +1983,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         via[2].via[T1CL] = xvalue; // 4 T1LC actually writes to T1LL only
         via[2].via[T1LL] = xvalue;
         via[2].t1_e = get_via_te_from_timer((via[2].via[T1LH] << 8) | via[2].via[T1LL]);
+        via[2].last_port = port;
 
         FIX_CLKSTOP_VIA_T1(2); // update cpu68k_clocks_stop if needed
 
@@ -1940,6 +1999,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
     case T1LH2:
         DEBUG_LOG(0, "T1LH2");
         via[2].via[T1LH] = (xvalue); // Set timer1 latch and counter
+        via[2].last_port = port;
         via_running = 1;
         // 2005.05.31 - this next line was disabled - should it have been?
         // via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
@@ -1957,6 +2017,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         DEBUG_LOG(0, "T1CL2");
 
         via[2].via[T1LL] = xvalue;
+        via[2].last_port = port;
 
         via_running = 1;
 
@@ -1977,6 +2038,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         via[2].t1_e = get_via_te_from_timer((via[2].via[T1CH] << 8) | via[2].via[T1LL]); // this one does tell the counter to count down!
         FIX_CLKSTOP_VIA_T1(2);                                                           // update cpu68k_clocks_stop if needed
         via[2].t1_set_cpuclk = cpu68k_clocks;                                            // timer was set right now (at this clock)
+        via[2].last_port = port;
 
         VIA_CLEAR_IRQ_T1(2); // clear T1 irq on T1 read low or write high
 
@@ -1994,6 +2056,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         // #ifdef DEBUG
         via[2].t2_set_cpuclk = cpu68k_clocks;
+        via[2].last_port = port;
         DEBUG_LOG(0, "t2clk:%d (write takes effect on write to T2H) T2 set to expire at clock:%llx time now is %llx which is %llx cycles from now",
                   ((via[2].via[T2LH] << 8) | via[2].via[T2CL]), via[2].t2_e, cpu68k_clocks, via[2].t2_e - cpu68k_clocks);
         // #endif
@@ -2007,6 +2070,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         via[2].via[T2LH] = xvalue; // Set t2 latch high
         via[2].via[T2CH] = xvalue;
         via[2].via[T2CL] = via[2].via[T2LL]; // load the counter with latches
+        via[2].last_port = port;
 
         VIA_CLEAR_IRQ_T2(2); // clear T2 irq on T2 read low or write high
 
@@ -2032,6 +2096,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         via[2].via[SHIFTREG] = xvalue; // write shift register
         via_running = 1;
         via[2].srcount = 0;
+        via[2].last_port = port;
 
         // if (shift==4) {} - free running mode from T2 - timing tied to T2
         // if (shift==5) {} - one shot T2 mode - timing tied to T2
@@ -2099,6 +2164,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         }
 #endif
         via[2].via[ACR] = xvalue;
+        via[2].last_port = port;
         return;
 
     case PCR2:
@@ -2173,6 +2239,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
         if ((via[2].via[PCR] ^ xvalue) & 1)
             via[2].via[IFR] |= VIA_IRQ_BIT_CA1;
         via[2].via[PCR] = xvalue;
+        via[2].last_port = port;
         return;
 
     case IFR2: /* IFR  */
@@ -2188,6 +2255,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
                   (via[2].via[IFR] & 128) ? "ifr7ANY:on" : "ifr7ANY:off");
 
         via[2].via[IFR] &= ~(xvalue); // 1 writes to IFR are used to clear bits!
+        via[2].last_port = port;
         FIX_VIA_IFR(2);
 
         DEBUG_LOG(0, "IFR2 write=%02x bits: %s %s %s %s %s %s %s %s", xvalue,
@@ -2212,6 +2280,7 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         // clear out anything that IER has disabled on the write.  2020.11.06
         via[2].via[IFR] &= via[2].via[IER];
+        via[2].last_port = port;
         FIX_VIA_IFR(2);
 
 // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.
@@ -2264,7 +2333,8 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
     // if (via[2].ProFile) VIAProfileLoop(2,via[2].ProFile,PROLOOP_EV_NUL); // 2021.05.24
 
-    switch (addr & 0x79) // was 7f, changing to 79
+    uint8 port = addr & 0x79; // was 7f, changing to 79
+    switch (port) 
     {
     case IRB2:
     {
@@ -2289,6 +2359,7 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
         DEBUG_LOG(0, "via2_irb() returned %02x", via[2].via[IRBB]);
 
         via[2].via[IRB] = (via[2].via[IRBB] & (~via[2].via[DDRB])) | (via[2].via[ORBB] & via[2].via[DDRB]);
+        via[2].last_port = port;
 
         DEBUG_LOG(0, "returning irb & !DDRB is %02x", via[2].via[IRB]);
 
@@ -2332,6 +2403,7 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
         via[2].via[IRAA] = (via2_ira(15));
         via[2].via[IRA] = (via[2].via[IRAA] & (~via[2].via[DDRA])) | (via[2].via[ORAA] & via[2].via[DDRA]); // read data from port base it on DDRA mask
+        via[2].last_port = port;
 
         DEBUG_LOG(0, "profile.c:widget.c: IRANH2  Profile to Lisa <%02x  pc24:%08x", via[2].via[IRA], pc24);
         return via[2].via[IRA];
@@ -2347,6 +2419,7 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
         via[2].via[IRAA] = (via2_ira(15));
         via[2].via[IRA] = (via[2].via[IRAA] & (~via[2].via[DDRA])) | (via[2].via[ORAA] & via[2].via[DDRA]); // read data from port base it on DDRA mask
+        via[2].last_port = port;
 
         DEBUG_LOG(0, "profile.c:widget.c: IRA2  Profile to Lisa <%02x   pc24:%08x", via[2].via[IRA], pc24);
         return via[2].via[IRA];
@@ -2361,11 +2434,13 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
     case T1LL2: // Timer 1 Low Order Latch
         DEBUG_LOG(0, "T1LL2=%02x", (via[2].via[T1LL]));
         VIA_CLEAR_IRQ_T1(2); // clear T1 irq on T1 read low or write high - does this clear the timer? // 2020.11.06 re-enabling this and fixing via #
+        via[2].last_port = port;
 
         return (via[2].via[T1LL]);
 
     case T1LH2: // Time 1 High Order Latch
         DEBUG_LOG(0, "T1LH2 %02x", via[2].via[T1LH]);
+        via[2].last_port = port;
         return via[2].via[T1LH];
 
     case T1CL2: // Timer 1 Low Order Counter
@@ -2374,18 +2449,21 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
         // via[2].via[T1CL]=get_via_timer_left_from_te(via[2].t1_e) & 0xff;
 
         via[2].via[T1CL] = get_via_timer_left_or_passed_from_te(via[2].t1_e, via[2].t1_set_cpuclk) & 0xff;
+        via[2].last_port = port;
         return via[2].via[T1CL];
 
     case T1CH2: // Timer 1 High Order Counter
         DEBUG_LOG(0, "T1CH2");
         VIA_CLEAR_IRQ_T1(2); // clear timer 1 interrupt on access
         via[2].via[T1CH] = get_via_timer_left_or_passed_from_te(via[2].t1_e, via[2].t1_set_cpuclk) >> 8;
+        via[2].last_port = port;
         return via[2].via[T1CH];
 
     case T2CL2: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL2 t2_e:%ld set at:%ld", via[2].t2_e, via[2].t2_set_cpuclk);
 
         via[2].via[T2CL] = get_via_timer_left_or_passed_from_te(via[2].t2_e, via[2].t2_set_cpuclk) & 0xff;
+        via[2].last_port = port;
 
         // via[2].via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
         VIA_CLEAR_IRQ_T2(2); // clear T2 irq on T1 read low or write high
@@ -2395,20 +2473,24 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
     case T2CH2:
         DEBUG_LOG(0, "T2CH2"); // return via[2].via[T2CH];
         via[2].via[T2CH] = get_via_timer_left_or_passed_from_te(via[2].t2_e, via[2].t2_set_cpuclk) >> 8;
+        via[2].last_port = port;
         return via[2].via[T2CH];
 
     case SR2:
     {
         DEBUG_LOG(0, "SR2");
         VIA_CLEAR_IRQ_SR(2); // clear SR irq on SR access
+        via[2].last_port = port;
         return via[2].via[SHIFTREG];
     }
 
     case ACR2:
         DEBUG_LOG(0, "ACR2");
+        via[2].last_port = port;
         return via[2].via[ACR];
     case PCR2:
         DEBUG_LOG(0, "PCR2");
+        via[2].last_port = port;
         return via[2].via[PCR];
 
     case IFR2:
@@ -2436,11 +2518,13 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
                   (via[2].via[IFR] & 64) ? "ifr6T1 :on" : "ifr6T1 :off",
                   (via[2].via[IFR] & 128) ? "ifr7ANY:on" : "ifr7ANY:off");
 
+        via[2].last_port = port;
         return via[2].via[IFR];
 
     case IER2:
         DEBUG_LOG(0, "IER2");
         via[2].via[IER] |= 0x80; // docs says this returns logical 1 for bit 7 when read
+        via[2].last_port = port;
         return via[2].via[IER];
 
     default:
@@ -2726,7 +2810,8 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
     if (V->ProFile)
         VIAProfileLoop(V->vianum, V->ProFile, PROLOOP_EV_NUL); // 2021.05.24
 
-    switch (addr & 0x79) // was 7f, changing to 79
+    uint8 port = addr & 0x79; // was 7f, changing to 79
+    switch (port) 
     {
     case IRB2:
     {
@@ -2749,6 +2834,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
         DEBUG_LOG(0, "viaX_irb() returned %02x", V->via[IRBB]);
 
         V->via[IRB] = (V->via[IRBB] & (~V->via[DDRB])) | (V->via[ORBB] & V->via[DDRB]);
+        V->last_port = port;
 
         DEBUG_LOG(0, "returning irb & !DDRB is %02x", V->via[IRB]);
 
@@ -2787,6 +2873,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
 
         V->via[IRAA] = (viaX_ira(V, 15));
         V->via[IRA] = (V->via[IRAA] & (~V->via[DDRA])) | (V->via[ORAA] & V->via[DDRA]); // read data from port base it on DDRA mask
+        V->last_port = port;
 
         DEBUG_LOG(0, "profile.c:widget.c: Profile->Lisa IRANH %02x  pc24:%08x", V->via[IRA], pc24); // 20060105 or in old outputs
         return V->via[IRA];
@@ -2799,24 +2886,29 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
 
         V->via[IRAA] = (viaX_ira(V, 15));
         V->via[IRA] = (V->via[IRAA] & (~V->via[DDRA])) | (V->via[ORAA] & V->via[DDRA]);             // read data from port base it on DDRA mask
+        V->last_port = port;
         DEBUG_LOG(0, "profile.c:widget.c: Profile->Lisa IRA2 %02x   pc24:%08x", V->via[IRA], pc24); // 20060105 or in old outputs
 
         return V->via[IRA];
 
     case DDRB2:
         DEBUG_LOG(0, "DDRB");
+        V->last_port = port;
         return V->via[DDRB]; // DDRB
     case DDRA2:
         DEBUG_LOG(0, "DDRA");
+        V->last_port = port;
         return V->via[DDRA]; // DDRA
 
     case T1LL2: // Timer 1 Low Order Latch
         DEBUG_LOG(0, "T1LL2=%02x", (V->via[T1LL]));
         VIA_CLEAR_IRQ_T1(V->vianum);
+        V->last_port = port;
         return (V->via[T1LL]);
 
     case T1LH2: // Time 1 High Order Latch
         DEBUG_LOG(0, "T1LH2 %02x", V->via[T1LH]);
+        V->last_port = port;
         return V->via[T1LH];
 
     case T1CL2: // Timer 1 Low Order Counter
@@ -2825,18 +2917,21 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
         // V->via[T1CL]=get_via_timer_left_from_te(V->t1_e) & 0xff;
 
         V->via[T1CL] = get_via_timer_left_or_passed_from_te(V->t1_e, V->t1_set_cpuclk) & 0xff;
+        V->last_port = port;
         return V->via[T1CL];
 
     case T1CH2: // Timer 1 High Order Counter
         DEBUG_LOG(0, "T1CH2");
         VIA_CLEAR_IRQ_T1(V->vianum); // clear timer 1 interrupt on access
         V->via[T1CH] = get_via_timer_left_or_passed_from_te(V->t1_e, V->t1_set_cpuclk) >> 8;
+        V->last_port = port;
         return V->via[T1CH];
 
     case T2CL2: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL2 t2_e:%ld set at:%ld", V->t2_e, V->t2_set_cpuclk);
 
         V->via[T2CL] = get_via_timer_left_or_passed_from_te(V->t2_e, V->t2_set_cpuclk) & 0xff;
+        V->last_port = port;
 
         // V->via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
         VIA_CLEAR_IRQ_T2(V->vianum); // clear T2 irq on T1 read low or write high
@@ -2846,6 +2941,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
     case T2CH2:
         DEBUG_LOG(0, "T2CH2"); // return V->via[T2CH];
         V->via[T2CH] = get_via_timer_left_or_passed_from_te(V->t2_e, V->t2_set_cpuclk) >> 8;
+        V->last_port = port;
         return V->via[T2CH];
 
     case SR2:
@@ -2855,14 +2951,17 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
         /// if (shift==2) {V->sr_e=cpu68k_clocks+8*via_clock_diff; get_next_timer_event();}
         DEBUG_LOG(0, "SR");
         VIA_CLEAR_IRQ_SR(V->vianum); // clear SR irq on SR access
+        V->last_port = port;
         return V->via[SHIFTREG];
     }
 
     case ACR2:
         DEBUG_LOG(0, "ACR");
+        V->last_port = port;
         return V->via[ACR];
     case PCR2:
         DEBUG_LOG(0, "PCR");
+        V->last_port = port;
         return V->via[PCR];
 
     case IFR2:
@@ -2878,6 +2977,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
         }
 
         V->via[IFR] &= ~VIA_IRQ_BIT_SR; // explicitly shut off SR bit.
+        V->last_port = port;
         FIX_VIAP_IFR();
         DEBUG_LOG(0, "IFR2=%02x", V->via[IFR]);
 
@@ -2896,6 +2996,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
     case IER2:
         DEBUG_LOG(0, "IER2");
         V->via[IER] |= 0x80; // docs says this returns logical 1 for bit 7 when read
+        V->last_port = port;
         return V->via[IER];
 
     default:
@@ -2917,7 +3018,8 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
     DEBUG_LOG(0, "VIA:%d writing %02x to register %d (%s) @%08x", V->vianum, xvalue, (addr & 0x79) / 8, via_regname((addr & 0x79) / 8), addr);
 #endif
 
-    switch (addr & 0x79) // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
+    uint8 port = addr & 0x79; // fcd901      // was 0x7f it's now 0x79  // 2004.06.24 because saw MOVEP.W to T2CH, but suspect it also writes to T2CL!
+    switch (port) 
     {
     case ORB2: // IRB/ORB
     {
@@ -2962,6 +3064,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
 
         V->via[ORBB] = xvalue; // set the shadow register to the unmasked data for later use.
         V->via[ORB] = (V->via[IRBB] & (~V->via[DDRB])) | (V->via[ORBB] & V->via[DDRB]);
+        V->last_port = port;
 
         VIA_CLEAR_IRQ_PORT_B(V->vianum); // clear Cb1/Cb2 on ORb/IRb access
 
@@ -2978,13 +3081,17 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         if (V->ProFile)
             V->ProFile->last_a_accs = 1;
 
-        if (V->via[ORA] == xvalue)
-        {
-            DEBUG_LOG(0, "ORANH2: Already wrote %02 to port, not pushing it", xvalue);
-            return; // already what's on the port, ignore the write //20060418
-        }
+	// Note (TorZidan@): I commented out this code as I think it's wrong (it belongs in the "case ORA2" below).
+        // Once we confirm that things are running smoothly, we can remove this. See more in the docs for variable "last_port".
+        // if (V->via[ORA] == xvalue)
+        // {
+        //     DEBUG_LOG(0, "ORANH2: Already wrote %02 to port, not pushing it", xvalue);
+        //     return; // already what's on the port, ignore the write //20060418
+        // }
+
         V->via[ORAA] = xvalue; // set the shadow register to the unmasked data for later use.
         V->via[ORA] = (V->via[IRAA] & (~V->via[DDRA])) | (V->via[ORAA] & V->via[DDRA]);
+        V->last_port = port;
 
         if (!V->via[DDRA])
         { // don't write anything if the DDRA is all inputs
@@ -3002,11 +3109,20 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         V->last_a_accs = 1;
         if (V->ProFile)
             V->ProFile->last_a_accs = 1;
+
+        if (V->via[ORA] == xvalue && V->last_port == ORANH2)
+        {
+            DEBUG_LOG(0, "in ORA2: Already wrote %02x to ORANH2, not pushing it again.\n", xvalue);
+            via[2].last_port = port;
+            return; // already what's on the port, ignore the write
+        }
+
         VIA_CLEAR_IRQ_PORT_A(V->vianum); // clear CA1/CA2 on ORA/IRA access
 
         V->via[ORA] = (V->via[IRAA] & (~V->via[DDRA])) | (V->via[ORAA] & V->via[DDRA]);
 
         V->via[ORAA] = xvalue;
+        V->last_port = port;
 
         if (!V->via[DDRA])
         { // don't write anything if the DDRA is all inputs
@@ -3021,6 +3137,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
     case DDRB2: // DDRB 2
         DEBUG_LOG(0, "DDRB2");
         V->via[DDRB] = xvalue;
+        V->last_port = port;
 
         DEBUG_LOG(0, "Writing VIA2 DDRB mask=%02x:(%s%s%s%s%s%s%s%s)", V->via[DDRB],
                   ((V->via[DDRB] & 1) ? "OCD:PB0:out " : "OCD:pb0:in  "),
@@ -3042,6 +3159,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
                   V->via[DDRA], xvalue);
 
         V->via[DDRA] = xvalue;
+        V->last_port = port;
 
         DEBUG_LOG(0, "Wrote DDRA mask=%02x:(%s%s%s%s%s%s%s%s)", V->via[DDRA],
                   ((V->via[DDRA] & 1) ? "PA0:out " : "pb0:in  "),
@@ -3070,6 +3188,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         V->via[T1CL] = xvalue; // 4 T1LC actually writes to T1LL only
         V->via[T1LL] = xvalue;
         V->t1_e = get_via_te_from_timer((V->via[T1LH] << 8) | V->via[T1LL]);
+        V->last_port = port;
 
         FIX_CLKSTOP_VIA_T1(V->vianum); // update cpu68k_clocks_stop if needed
 
@@ -3085,6 +3204,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
     case T1LH2:
         DEBUG_LOG(0, "T1LH2");
         V->via[T1LH] = (xvalue); // Set timer1 latch and counter
+        V->last_port = port;
         via_running = 1;
         // 2005.05.31 - this next line was disabled - should it have been?
         // via[1].t1_e=get_via_te_from_timer((via[1].via[T1LH]<<8)|via[1].via[T1LL]);
@@ -3102,6 +3222,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         DEBUG_LOG(0, "T1CL2");
 
         V->via[T1LL] = xvalue;
+        V->last_port = port;
 
         // V->t1_e=get_via_te_from_timer((V->via[T1LH]<<8)|via[1].via[T1LL]);   // so, does this still count down? likely not!
         // FIX_CLKSTOP_VIA_T1(1);      // update cpu68k_clocks_stop if needed           // disable this code here.
@@ -3122,6 +3243,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         V->via[T1LH] = xvalue;   // load into register
         V->via[T1CH] = V->via[T1LH];
         V->via[T1CL] = V->via[T1LL]; // 5 T1HC actually writes to T1HL + copies T1LL->T1CL, T1LH->T1CH
+        V->last_port = port;
 
         V->t1_e = get_via_te_from_timer((V->via[T1CH] << 8) | V->via[T1LL]); // this one does tell the counter to count down!
         FIX_CLKSTOP_VIA_T1(2);                                               // update cpu68k_clocks_stop if needed
@@ -3140,6 +3262,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
     case T2CL2: // Set Timer 2 Low Latch
         DEBUG_LOG(0, "T2CL");
         V->via[T2LL] = xvalue; // Set t2 latch low
+        V->last_port = port;
         // V->via[T2CL]=xvalue;                                                       // NOT SURE ABout this one!  2004.12.02
         //  no change to the counter! only the latch! //2005.06.05
         //  V->t2_e=get_via_te_from_timer((V->via[T2LH]<<8)|V->via[T2CL]);     // set timer expiration
@@ -3161,6 +3284,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         V->via[T2LH] = xvalue; // Set t2 latch high
         V->via[T2CH] = xvalue;
         V->via[T2CL] = V->via[T2LL]; // load the counter with latches
+        V->last_port = port;
 
         VIA_CLEAR_IRQ_T2(V->vianum); // clear T2 irq on T2 read low or write high
 
@@ -3192,6 +3316,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
 
         DEBUG_LOG(0, "SR");
         V->via[SHIFTREG] = xvalue; // write shift register
+        V->last_port = port;
         via_running = 1;
         V->srcount = 0;
 
@@ -3261,6 +3386,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         }
 #endif
         V->via[ACR] = xvalue;
+        V->last_port = port;
         return;
 
     case PCR2:
@@ -3335,12 +3461,14 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         if ((V->via[PCR] ^ xvalue) & 1)
             V->via[IFR] |= 2;
         V->via[PCR] = xvalue;
+        V->last_port = port;
         return;
 
     case IFR2: /* IFR  */
 
         // V->via[IFR]&=(0x7f^(xvalue & 0x7f));  // 1 writes to IFR are used to clear bits!
         V->via[IFR] &= ~(xvalue); // 1 writes to IFR are used to clear bits!
+        V->last_port = port;
 
         if (V->via[IFR] & 127)
             V->via[IFR] |= 128; // if all are cleared, clear bit 7 else set it
@@ -3374,6 +3502,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         else
             V->via[IFR] = 0;
 
+        V->last_port = port;
 // from via 1// if bit 7=0, then all 1 bits are reversed. 1=no irq, 0=irq enabled.
 /// if   (xvalue & 128) {via[1].via[IER] |= xvalue;}
 /// else via[1].via[IER] &=(0x7f-( xvalue & 0x7f));
@@ -3464,6 +3593,7 @@ void init_vias(void)
         via[i].t2_set_cpuclk = 0;
         via[i].t1_fired_cpuclk = 0;
         via[i].t2_fired_cpuclk = 0;
+        via[i].last_port = 0xff; // an invalid port number
         // #endif
     }
 
@@ -3532,6 +3662,8 @@ void reset_via(int i)
     via[i].ca2 = 0;
     via[i].cb1 = 0;
     via[i].cb2 = 0;
+
+    via[i].last_port = 0xff; // an invalid port number
 
     via_running = 0;
 }

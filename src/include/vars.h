@@ -888,6 +888,12 @@ typedef struct
                   // PA gets data out and CA2 is set.  So to avoid a bug where an extra ORA is made when
                   // DDRA=FF, ORA is written, DDRA=0, then DDRA=FF, this keeps track of the pending.
 
+  uint8 last_port;// Some Lisa software (e.g. MacWorksXL3.0 boot routines) write the same byte to the VIA twice: 
+                  // once to port ORANH2 (NH means "no handshake"), and then again to ORA2. 
+                  // We need to ignore the 2nd write, otherwise Lisa does not boot (we get a Lisa error 75).
+                  // Here we store the last port used, so that when writing to ORA2 we could check if the last
+                  // port was ORANH2 and the last value was the same, and ignore the write. 
+
   XTIMER t1_e; // e_clock trigger - at what point will the via clock expire vs cpu68k_clocks
   XTIMER t1_fired;
   XTIMER t2_e;
