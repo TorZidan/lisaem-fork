@@ -1800,20 +1800,20 @@ int floppy_insert(char *Image, uint8 insert_in_upper_floppy_drive) // emulator s
     {
         char message[] = "You are trying to use a Twiggy floppy image file in Lisa 2 mode, but it is intended to be used in Lisa 1 mode, with Lisa 1 software. This may not end well.\n\n"
             "Tips for booting from a Twiggy floppy disk image:\n"
-            "  - In the File->Preferences menu, choose I/O ROM version 40 (there's no need to modify the Lisa ROM). "
+            "  - In the File->Preferences menu, switch to Lisa 1 mode by choosing I/O ROM version 40 and any Lisa ROM file. "
             "Apply and restart the emulator.\n"
-            "  - Insert a Twiggy diskette (File->Insert diskette).\n"
-            "  - At the boot screen, click on the upper floppy drive 1 icon to boot from it."; 
+            "  - Insert a Twiggy diskette in the upper drive 1 (File->Insert diskette).\n"
+            "  - At the Lisa boot screen, click on the upper floppy drive 1 icon to boot from it."; 
         messagebox(message, "This may not end well :(");
     }
     else if (floppy_ram[ROMVER]==0x40 && F->ftype!=0) 
     {
         char message[] = "You are trying to use a Sony floppy image file in Lisa 1 mode, but it is intended to be used in Lisa 2 mode, with Lisa 2 software. This may not end well.\n\n"
             "Tips for booting from a Sony floppy disk image:\n"
-            "  - In the File->Preferences menu, choose any I/O ROM version but 40 (there's no need to modify the Lisa ROM). "
+            "  - In the File->Preferences menu, switch to Lisa 2 mode by choosing any I/O ROM version EXCEPT version 40, and a ROM file version H or 3A. "
             "Apply and restart the emulator.\n"
             "  - Insert a Sony diskette (File->Insert diskette).\n"
-            "  - At the boot screen, click on the floppy drive icon to boot from it."; 
+            "  - At the Lisa boot screen, click on the floppy drive icon to boot from it."; 
         messagebox(message, "This may not end well :(");
     }
 

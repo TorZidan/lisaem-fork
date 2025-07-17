@@ -7052,7 +7052,10 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
           {
             if(lisa_one_mode) 
             {
-              // Lisa 1 mode with two floppy drives:
+              // Lisa 1 mode with two Twiggy floppy drives:
+              // LOS1.0 does not provide a way to eject a floppy disk, so the only way to do so is by clicking in the floppy area
+              // (or hold Shift + click to eject the lower floppy disk 2),
+              // which triggers this code; it fires a Floppy eject IRQ.
               bool is_shift_key_down = wxGetKeyState(WXK_SHIFT);
               if(!is_shift_key_down && is_upper_floppy_currently_inserted())
               {
@@ -7081,23 +7084,14 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
             }
             else
             {
-              // Lisa 2 mode with one floppy drive (which is the lower drive):
-              if(is_lower_floppy_currently_inserted())
-              {
-                if (yesnomessagebox("Do you want to eject the diskette?\n\n"
-                  "Note that the currently running Lisa software may ignore the eject request.", "") != 0) 
-                {
-                  floppy_eject_button_pressed(0); // 0 means "lower drive"
-                } 
-              }
-              else
-              {
-                // Show the "open floppy image file" dialog:
-                if (event.LeftDown())
-                  my_lisaframe->OnxFLOPPY();
-                else if (event.RightDown())
-                  my_lisaframe->OnxNewFLOPPY();
-              }
+              // Lisa 2 mode with one floppy drive.
+              // The Lisa 2 does not have a physical floppy eject button, and also the Lisa 2 software
+              // (e.g LOS3.0) ignores any floppy eject IRQ requests; Hence, we don't attempt to eject
+              // the floppy here. So just show the "open floppy image file" dialog:
+              if (event.LeftDown())
+                my_lisaframe->OnxFLOPPY();
+              else if (event.RightDown())
+                my_lisaframe->OnxNewFLOPPY();
             }
           }
         }
@@ -8294,8 +8288,7 @@ void LisaEmFrame::OnxFLOPPY(void)
     else if(!lisa_one_mode && is_lower_floppy_currently_inserted()) 
     {
       wxMessageBox(_T("A previously inserted diskette is still in the drive. "
-        "Please eject the diskette before inserting another.\n\n"
-        "Tip: to eject it, click somewhere in the floppy drive area."),
+        "Please eject the diskette before inserting another.\n"),
         _T("Diskette is already inserted!"), wxICON_INFORMATION | wxOK);
       return;
     }
