@@ -23,4 +23,4 @@ jobs:
         run: |
           echo "Cygwin is installed!"
           cygcheck -c cygwin
-          ls ${{ github.workspace }}
+          ls -la "$(cygpath '${{ github.workspace }}')"
