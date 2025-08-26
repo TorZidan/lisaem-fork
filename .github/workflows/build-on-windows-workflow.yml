@@ -20,25 +20,24 @@ jobs:
           # Provide a space-separated or comma-separated list of packages to install
           packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make
 
-      # Example step to verify the installation by running a Cygwin command
-      - name: Run a command in Cygwin
+      - name: Run a simple echo command in Cygwin to test the installation
         shell: bash --login --norc -eo pipefail {0}
         run: echo "Cygwin is installed!"
 
-      - name: Run a command in Cygwin
+      - name: Print the installed Cygwin version
         shell: bash --login --norc -eo pipefail {0}
         run: cygcheck -c cygwin
 
-      - name: Run a command in Cygwin
-        shell: bash --login --norc -eo pipefail {0}
-        run: ls -la /cygdrive
-
-      - name: Run a command in Cygwin 4
+      - name: List the checked out LisaEm files (the top folder only)
         shell: bash --login --norc -eo pipefail {0}
         run: ls -la "$(cygpath '${{ github.workspace }}')"
 
-      - name: Run a command in Cygwin
+      - name: Download WxWidgets from the web and build it
         shell: bash --login --norc -eo pipefail {0}
         run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
-        
+
+      - name: Build LisaEm
+        shell: bash --login --norc -eo pipefail {0}
+        run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build
+
       
