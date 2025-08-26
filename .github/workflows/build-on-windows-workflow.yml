@@ -16,6 +16,9 @@ jobs:
       # Installs the latest Cygwin with default packages
       - name: Install Cygwin
         uses: cygwin/cygwin-install-action@master
+        with:
+          # Provide a space-separated or comma-separated list of packages to install
+          packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make
 
       # Example step to verify the installation by running a Cygwin command
       - name: Run a command in Cygwin
