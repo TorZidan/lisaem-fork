@@ -24,6 +24,7 @@ jobs:
           echo "Cygwin is installed!"
           cygcheck -c cygwin
           ls -la /cygdrive
+          ls -la /cygdrive
           ls -la /cygdrive/d
           ls -la /cygdrive/d/a
           ls -la "$(cygpath '${{ github.workspace }}')"
