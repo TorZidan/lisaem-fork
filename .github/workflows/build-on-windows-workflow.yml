@@ -36,6 +36,6 @@ jobs:
 
       - name: Run a command in Cygwin
         shell: bash --login --norc -eo pipefail {0}
-        run: cd "$(cygpath '${{ github.workspace }}')/lisaem/scripts" && ./build-wx3.2.7-cygwin-windows.sh
+        run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
         
       
