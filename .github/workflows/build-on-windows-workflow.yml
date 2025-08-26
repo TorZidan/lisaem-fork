@@ -19,4 +19,5 @@ jobs:
         shell: bash --login --norc -eo pipefail {0}
         run: |
           echo "Cygwin is installed!"
-          uname -a
+          cygcheck -c cygwin
+          ls ${{ github.workspace }}
