@@ -20,11 +20,16 @@ jobs:
       # Example step to verify the installation by running a Cygwin command
       - name: Run a command in Cygwin
         shell: bash --login --norc -eo pipefail {0}
-        run: |
-          echo "Cygwin is installed!"
-          cygcheck -c cygwin
-          ls -la /cygdrive
-          ls -la /cygdrive
-          ls -la /cygdrive/d
-          ls -la /cygdrive/d/a
-          ls -la "$(cygpath '${{ github.workspace }}')"
+        run: echo "Cygwin is installed!"
+
+      - name: Run a command in Cygwin 2
+        shell: bash --login --norc -eo pipefail {0}
+        run: cygcheck -c cygwin
+
+      - name: Run a command in Cygwin 3
+        shell: bash --login --norc -eo pipefail {0}
+        run: ls -la /cygdrive
+        
+      - name: Run a command in Cygwin 4
+        shell: bash --login --norc -eo pipefail {0}
+        run: ls -la "$(cygpath '${{ github.workspace }}')"
