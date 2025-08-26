@@ -7,6 +7,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # Avoid \r\n line endings
+      - run: git config --global core.autocrlf input
+
       # Checks-out my repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
