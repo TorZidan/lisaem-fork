@@ -42,5 +42,5 @@ jobs:
 
       - name: List the built LisaEm executable
         shell: bash --login --norc -eo pipefail {0}
-        run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.*"
+        run: ls -l "$(cygpath '${{ github.workspace }}')"
       
