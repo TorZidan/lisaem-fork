@@ -30,17 +30,16 @@ jobs:
 
       - name: List the checked out LisaEm files (the top folder only)
         shell: bash --login --norc -eo pipefail {0}
-        run: ls -la .
+        run: ls -la "$(cygpath '${{ github.workspace }}')"
 
       - name: Download WxWidgets from the web and build it
         shell: bash --login --norc -eo pipefail {0}
-        run: cd ./scripts && ./build-wx3.2.7-cygwin-windows.sh
+        run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
 
       - name: Build LisaEm
         shell: bash --login --norc -eo pipefail {0}
-        run: ./build.sh clean build
+        run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build
 
-      - name: List the built LisaEm executable bin/lisaem.exe
+      - name: List the produced executable lisaem.exe
         shell: bash --login --norc -eo pipefail {0}
-        run: ls -l ./bin/lisaem.exe
-      
+        run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe"
