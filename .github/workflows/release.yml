@@ -1,0 +1,43 @@
+# .github/workflows/release.yml
+
+name: Create and Publish new release artifacts
+
+# This workflow runs when a new tag starting with 'v' is pushed to the repository
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release file for Ubuntu 64-bit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------
+      # Replace this with your project's build commands
+      # This example creates a dummy file as a build artifact
+      - name: Build project
+        run: |
+          echo "This is our build artifact!" > build_output.txt
+      # ---------------------------------------------------
+
+      - name: Package release assets
+        run: zip release-assets.zip build_output.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # The name of the release. It uses the tag name (e.g., "v1.0.0")
+          name: Release ${{ github.ref_name }}
+
+          # The files to upload as release assets.
+          # You can use wildcards (e.g., "dist/*.zip")
+          files: release-assets.zip
+        env:
+          # This token is required to create a release.
+          # It's automatically provided by GitHub Actions.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
