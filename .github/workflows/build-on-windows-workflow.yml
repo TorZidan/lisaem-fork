@@ -4,7 +4,13 @@ on: [push]
 
 defaults:
   run:
-    shell: bash --login --norc -eo pipefail {0}
+    # "--norc" means "do not read execute ~/.bashrc
+    # "-eo pipefail" causes the shell to exit immediately if any simple command fails 
+    # (exits with a non-zero status). The exit status of a pipeline
+    # (a sequence of commands connected by |) is:
+    # the status of the rightmost command to exit with a non-zero status, 
+    # or zero if all commands succeed.
+    shell: bash --norc -eo pipefail {0}
 
 jobs:
   build:
@@ -41,5 +47,4 @@ jobs:
         run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build
 
       - name: List the produced executable lisaem.exe
-        shell: bash --login --norc -eo pipefail {0}
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe"
