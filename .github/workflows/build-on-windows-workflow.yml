@@ -4,13 +4,14 @@ on: [push]
 
 defaults:
   run:
-    # "--norc" means "do not read execute ~/.bashrc
+    # "--login" carries over env. variables from one "run" command to the next.
+    # "--norc" means "do not execute ~/.bashrc .
     # "-eo pipefail" causes the shell to exit immediately if any simple command fails 
     # (exits with a non-zero status). The exit status of a pipeline
     # (a sequence of commands connected by |) is:
     # the status of the rightmost command to exit with a non-zero status, 
     # or zero if all commands succeed.
-    shell: bash --norc -eo pipefail {0}
+    shell: bash --login --norc -eo pipefail {0}
 
 jobs:
   build:
