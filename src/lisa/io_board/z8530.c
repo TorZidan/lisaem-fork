@@ -240,23 +240,24 @@ void set_baud_rate(int port, uint32 baud);
 
 extern char read_serial_port_telnetd(unsigned int port);
 extern void write_serial_port_telnetd(unsigned int port, char c);
-extern void init_telnet_serial_port(int portnum);
 extern int poll_telnet_serial_read(int portnum);
+ 
+extern char read_serial_port_shell(unsigned int port);
+extern void write_serial_port_shell(unsigned int port, char c);
 
 extern char read_serial_port_pty(unsigned int port);
 extern void write_serial_port_pty(unsigned int port, char c);
-extern void init_pty_serial_port(int portnum);
+extern void set_dtr_pty(unsigned int port, uint8 value);
 
 extern char read_serial_port_tty(unsigned int port);
 extern void write_serial_port_tty(unsigned int port, char c);
-extern void init_tty_serial_port(int portnum);
 extern void set_port_baud_tty(int port, uint32 baud);
+
 
 #else
 // temp disable for windows until we flesh these guys out
-char read_serial_port_pty(unsigned int port) { return 0; }
+char read_serial_port_shell(unsigned int port) { return 0; }
 extern char read_serial_port_tty(unsigned int port);
-void write_serial_port_pty(unsigned int port, char c) {}
 int poll_telnet_serial_read(int portnum) { return 0; }
 #endif
 
@@ -460,9 +461,9 @@ void read_port_if_ready_nothing(unsigned int port)
 
 void rx_char_available(int port) { RX_CHAR_AVAILABLE(port); }
 
-void read_port_if_ready_pty(unsigned int port)
+void read_port_if_ready_shell(unsigned int port)
 {
-  int data = read_serial_port_pty(port);
+  int data = read_serial_port_shell(port);
   if (data > -1)
   {
     // ALERT_LOG(0,"---vvv---------------------------------------------------------------------------------------------------------------");
@@ -472,6 +473,24 @@ void read_port_if_ready_pty(unsigned int port)
     DEBUG_LOG(0, "Received 0x%02x (%d) %c from scc port:%d (mask:%02x) serial_b fliflo size is:%d",
               (uint8)(data), data,
               ((data > 31) ? ((uint8)(data)) : '.'),
+              port, scc_bits_per_char_mask[0],
+              fliflo_buff_size(&SCC_READ[0]));
+    // fliflo_dump(stderr,&SCC_READ[0],"AFTER buff_add to queue");
+    // ALERT_LOG(0,"----^^^-------------------------------------------------------------------------------------------------------------");
+  }
+}
+
+void read_port_if_ready_pty(unsigned int port)
+{
+  int data = read_serial_port_pty(port);
+  if (data > -1)
+  {
+    // ALERT_LOG(0,"---vvv---------------------------------------------------------------------------------------------------------------");
+    // fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
+    fliflo_buff_add(&SCC_READ[port], (uint8)(data)&scc_bits_per_char_mask[port]);
+    rx_char_available(port);
+    ALERT_LOG(0, "Received %c (%d) on scc port:%d (mask:%02x) ; new fliflo size is:%d",
+              data, data,
               port, scc_bits_per_char_mask[0],
               fliflo_buff_size(&SCC_READ[0]));
     // fliflo_dump(stderr,&SCC_READ[0],"AFTER buff_add to queue");
@@ -648,10 +667,17 @@ void initialize_scc(int actual)
       scc_fn[port].read_port_if_ready = read_port_if_ready_telnetd;
       break;
 
+    case SCC_SHELL:
+      scc_fn[port].read_serial_port = read_serial_port_shell;
+      scc_fn[port].write_serial_port = write_serial_port_shell;
+      scc_fn[port].read_port_if_ready = read_port_if_ready_shell;
+      break;
+
     case SCC_PTY:
       scc_fn[port].read_serial_port = read_serial_port_pty;
       scc_fn[port].write_serial_port = write_serial_port_pty;
       scc_fn[port].read_port_if_ready = read_port_if_ready_pty;
+      scc_fn[port].set_dtr = set_dtr_pty;
       break;
 
     case SCC_TTY:
@@ -1182,6 +1208,8 @@ void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data)
         TX_BUFF_EMPTY(port);
 
 #ifdef DEBUG
+        if (scc_fn[port].write_serial_port == write_serial_port_shell)
+          ALERT_LOG(0, "sent to shell");
         if (scc_fn[port].write_serial_port == write_serial_port_pty)
           ALERT_LOG(0, "sent to pty");
         if (scc_fn[port].write_serial_port == write_serial_port_nothing)
@@ -1732,10 +1760,10 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       //                                    port);
       //                        }
       //               }
-
-      if (serial_b == SCC_PTY)
-        read_port_if_ready_pty(0);
-      //               { int data=read_serial_port_pty(0); // ::TODO:: this sometimes hangs - read gets called when it should not be even though we check for presence of data avail
+ 
+      if (serial_b == SCC_SHELL)
+        read_port_if_ready_shell(0);
+      //               { int data=read_serial_port_shell(0); // ::TODO:: this sometimes hangs - read gets called when it should not be even though we check for presence of data avail
       //                 if (data>-1)
       //                        {
       //                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
@@ -1745,11 +1773,11 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       //                                   port,pc24);
       //                        }
       //               }
-
-      if (serial_a == SCC_PTY)
-        read_port_if_ready_pty(1);
+ 
+      if (serial_a == SCC_SHELL)
+        read_port_if_ready_shell(1);
       //               {
-      //                 int data=read_serial_port_pty(1);
+      //                 int data=read_serial_port_shell(1);
       //                 if (data>-1) {fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
       //                               ALERT_LOG(0,"Received %02x %c from scc port:%d",
       //                                    (uint8)(data),
@@ -1757,6 +1785,11 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       //                                    port);
       //                        }
       //               }
+
+      if (serial_b == SCC_PTY)
+        read_port_if_ready_pty(0);
+      if (serial_a == SCC_PTY)
+        read_port_if_ready_pty(1);
 
       if (serial_b == SCC_TTY)
         read_port_if_ready_tty(0);
@@ -2418,5 +2451,4 @@ void write_serial_port(unsigned port, char data)
   return;
 }
 
-// 30156-/usr/bin/x86_64-w64-mingw32-ld: obj/z8530.o:z8530.c:(.text+0x6fb): undefined reference to `read_serial_port_pty'
 // 30157-/usr/bin/x86_64-w64-mingw32-ld: obj/z8530.o:z8530.c:(.text+0x8e9): undefined reference to `poll_telnet_serial_read'

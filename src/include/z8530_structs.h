@@ -41,9 +41,10 @@
 #define SCC_TELNETTO 18 // not yet implemented
 #define SCC_IMAGEWRITER_PS 19
 #define SCC_IMAGEWRITER_PCL 20
-#define SCC_PTY 21      // pseudo terminal/shell
+#define SCC_PTY 21      // pseudo terminal
 #define SCC_TTY 22      // physical serial port
 #define SCC_TERMINAL 23 // terminal window
+#define SCC_SHELL 24    // shell
 
 #define SCC_BUFFER_SIZE 32768
 

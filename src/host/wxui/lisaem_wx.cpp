@@ -1914,7 +1914,7 @@ bool DnDFile::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames)
     UNUSED(y);
     // we only accept a single file, then verifiy that it's either an ASCIItext file or disk image
     // if it's a disk image, must be a floppy, not a hard disk.
-    ALERT_LOG(0, "In OnDrop at %d,%d count %d", (int)(x), (int)(y), (int)(filenames.GetCount()));
+    ALERT_LOG(0, "In OnDrop at %d,%d count %zu", (int)(x), (int)(y), filenames.GetCount());
     if (filenames.IsEmpty())
       return false;
     if (filenames.GetCount() > 1)
@@ -3191,6 +3191,21 @@ bool LisaEmApp::OnInit()
 {
     if (!wxApp::OnInit())
       return false; // call default behaviour (mandatory)
+
+    // Normally, if you type anything in the terminal window from where you
+    // launched LisaEm, LisaEm will freeze and your only option is to restart it.
+    // This is annoying.
+    // This workaround prevents LisaEm from freezing, but it should be used only when
+    // NOT using the "gdb" debugger,as the debugger requires user input.
+    if (getenv("LISAEM_CLOSE_STDIN") != NULL) {
+      // If the "LISAEM_CLOSE_STDIN" env. variable is set (to any value),
+      // close the STDIN file descriptor immediately, which fixes the issue described above.
+      // Should work well on all platforms, including Cygwin on Windows, MacOS.
+      ALERT_LOG(0, "The LISAEM_CLOSE_STDIN env var is set (to any value). "
+        "Disabling STDIN input, to prevent LisaEm from freezing if we type "
+        "anything into the terminal window that started it.");
+      close(STDIN_FILENO);
+    }
 
     wxStandardPathsBase &stdp = wxStandardPaths::Get();
     wxString defaultconfig = stdp.GetUserConfigDir();
@@ -9440,7 +9455,8 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
 
 
 extern "C" void disconnect_serial(int port);
-extern "C" void init_pty_serial_port(int port);
+extern "C" void init_pty_serial_port(int port, char *desired_pty_port_symlink_name);
+extern "C" void init_shell_serial_port(int port);
 extern "C" void init_tty_serial_port(int port, char *config);
 
 extern "C" void init_terminal_serial_port(int port);
@@ -9530,18 +9546,36 @@ extern "C" void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *ser
       return;
     }
 
-    if (setting->IsSameAs(_T("Shell"), false))
+    if (setting->IsSameAs(_T("PseudoTTY"), false))
     {
       unsigned long x;
       *scc_port_F = NULL;
       *serial = SCC_PTY;
 
       ALERT_LOG(0, "-----------------------------------------\n\n");
-      ALERT_LOG(0, "Attaching new PTY to fork-exec %s process, on serial port %d", cstr_param, port);
+      ALERT_LOG(0, "Attaching new PTY to port name %s, on serial port %d", cstr_param, port);
 
-      init_pty_serial_port(port);
+      init_pty_serial_port(port, cstr_param);
 
       ALERT_LOG(0, "return from init_pty_serial_port %d", port);
+      ALERT_LOG(0, "-----------------------------------------\n\n");
+
+      return;
+    }
+
+    if (setting->IsSameAs(_T("Shell"), false))
+    {
+      // What is this? See comments in file lisa/io_board/z8530-shell.c
+      unsigned long x;
+      *scc_port_F = NULL;
+      *serial = SCC_SHELL;
+
+      ALERT_LOG(0, "-----------------------------------------\n\n");
+      ALERT_LOG(0, "Attaching new shell to fork-exec a shell process on serial port %d", port);
+
+      init_shell_serial_port(port);
+
+      ALERT_LOG(0, "return from init_shell_serial_port %d", port);
       ALERT_LOG(0, "-----------------------------------------\n\n");
 
       return;
@@ -9558,7 +9592,7 @@ extern "C" void connect_device_to_serial(int port, FILE **scc_port_F, uint8 *ser
 
       init_terminal_serial_port(port);
 
-      ALERT_LOG(0, "return from init_pty_serial_port %d", port);
+      ALERT_LOG(0, "return from init_terminal_serial_port %d", port);
       ALERT_LOG(0, "-----------------------------------------\n\n");
 
       return;
@@ -9939,7 +9973,7 @@ int initialize_all_subsystems(void)
 
     setstatusbar("Initializing Lisa Boot ROM");
 
-    ALERT_LOG(0, "\n\nmmu_trans_all size: %d bytes\n\n", sizeof(mmu_trans_all));
+    ALERT_LOG(0, "\n\nmmu_trans_all size: %zu bytes\n\n", sizeof(mmu_trans_all));
 
     DEBUG_LOG(0, "Loading Lisa ROM");
     strncpy(tmp, CSTR(my_lisaconfig->rompath), MAXPATHLEN - 1);

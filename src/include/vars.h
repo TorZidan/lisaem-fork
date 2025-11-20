@@ -2507,7 +2507,8 @@ extern void profile_unmount(void);
 
 extern void init_sounds(void);
 extern void initialize_scc(int actual);
-extern void init_pty_serial_port(int port);
+extern void init_pty_serial_port(int port, char *desired_pty_port_symlink_name);
+extern void init_shell_serial_port(int port);
 extern void init_telnet_serial_port(int port);
 
 extern uint16 crc16(uint16 crc, uint8 data);

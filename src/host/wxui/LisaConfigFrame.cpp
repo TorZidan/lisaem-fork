@@ -158,7 +158,8 @@ LisaConfigFrame::LisaConfigFrame(const wxString &title, LisaConfig *lisaconfig)
     serportopts[6] = _T("TelnetD");
     serportopts[7] = _T("Shell");
     serportopts[8] = _T("Serial");
-    serialopts = 9;
+    serportopts[9] = _T("PseudoTTY");
+    serialopts = 10;
 #else
     serialopts = 6;
 #endif
@@ -428,6 +429,50 @@ void LisaConfigFrame::OnApply(wxCommandEvent &WXUNUSED(event))
     my_lisaconfig->serial2_setting = serportopts[serialbbox->GetSelection()];
     my_lisaconfig->serial1_param = serialaparam->GetValue();
     my_lisaconfig->serial2_param = serialbparam->GetValue();
+
+    if (my_lisaconfig->serial1_param.IsEmpty() && my_lisaconfig->serial1_setting.IsSameAs(_T("PseudoTTY"), false))
+    {
+        wxMessageDialog confirm(this,
+                                _T("The Pseudo TTY port alias for Serial Port A is empty. A port will still be opened, "
+                                    "but we also recommend specifying an alias, e.g. /tmp/lisaem-pseudo-tty-a, "
+                                    "so that you don't need to look for the port name.\n\n""Are you sure you want to continue?"),
+                                _T("Confirm empty Serial Port A alias name"),
+                                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+        if (confirm.ShowModal() != wxID_YES)
+            return; // Stop if user chooses No
+    }
+    if (my_lisaconfig->serial2_param.IsEmpty() && my_lisaconfig->serial2_setting.IsSameAs(_T("PseudoTTY"), false))
+    {
+        wxMessageDialog confirm(this,
+                                _T("The Pseudo TTY port alias for Serial Port B is empty. A port will still be opened, "
+                                    "but we also recommend specifying an alias, e.g. /tmp/lisaem-pseudo-tty-b, "
+                                    "so that you don't need to look for the port name.\n\n""Are you sure you want to continue?"),
+                                _T("Confirm empty Serial Port B alias name"),
+                                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+        if (confirm.ShowModal() != wxID_YES)
+            return; // Stop if user chooses No
+    }
+
+    if (my_lisaconfig->serial1_param.IsEmpty() && my_lisaconfig->serial1_setting.IsSameAs(_T("Serial"), false))
+    {
+        wxMessageDialog confirm(this,
+                                _T("The serial port name for Serial Port A is empty. Please specify a valid physical serial port name, "
+                                    "e.g. /dev/ttyUSB0, otherwise this functionality will be disabled.\n\n""Are you sure you want to continue?"),
+                                _T("Confirm empty Serial Port A name"),
+                                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+        if (confirm.ShowModal() != wxID_YES)
+            return; // Stop if user chooses No
+    }
+    if (my_lisaconfig->serial2_param.IsEmpty() && my_lisaconfig->serial2_setting.IsSameAs(_T("Serial"), false))
+    {
+        wxMessageDialog confirm(this,
+                                 _T("The serial port name for Serial Port B is empty. Please specify a valid physical serial port name, "
+                                    "e.g. /dev/ttyUSB0, otherwise this functionality will be disabled.\n\n""Are you sure you want to continue?"),
+                                _T("Confirm empty Serial Port B name"),
+                                wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
+        if (confirm.ShowModal() != wxID_YES)
+            return; // Stop if user chooses No
+    }
 
     /*
     fprintf(stderr,"serial a setting:%s\n",my_lisaconfig->serial1_setting.c_str());
