@@ -544,6 +544,7 @@ export  PHASE1LIST="\
         src/lisa/io_board/z8530-telnetd   \
         src/lisa/io_board/z8530-pty       \
         src/lisa/io_board/z8530-tty       \
+        src/lisa/io_board/z8530-shell     \
         src/lisa/io_board/via6522         \
         src/lisa/cpu_board/irq            \
         src/lisa/cpu_board/mmu            \
