@@ -408,7 +408,7 @@ int main(int argc, char *argv[])
    {
       fprintf(stderr, "Could not create %s\n", raw);
       perror("");
-      dc42_close_image(&F);
+      F.close_image(&F);
       exit(1);
    }
 
@@ -460,17 +460,17 @@ int main(int argc, char *argv[])
       printf("Copying blocks from %s\n", Image);
       for (x = 0; x < F.numblocks; x++)
       {
-         data = dc42_read_sector_data(&F, x);
+         data = F.read_sector_data(&F, x);
          if (!data)
          {
             fprintf(stderr, "Could not read data for sector %d from image!\n", x);
-            dc42_close_image(&F);
+            F.close_image(&F);
             exit(2);
          }
          memcpy(&tarball[cursor], data, 512);
          cursor += 512;
       }
-      dc42_close_image(&F);
+      F.close_image(&F);
    }
 
    printf("Analyzing in memory data to consolidate spanned files and remove gaps.\n");

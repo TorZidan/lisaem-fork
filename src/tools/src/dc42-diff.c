@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open left image  %s because %s, %d\n", argv[1], Fleft.errormsg, ret);
-    dc42_close_image(&Fleft);
+    Fleft.close_image(&Fleft);
     exit(1);
   }
 
@@ -86,8 +86,8 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open right image %s because %s, %d\n", argv[2], Fright.errormsg, ret);
-    dc42_close_image(&Fleft);
-    dc42_close_image(&Fright);
+    Fleft.close_image(&Fleft);
+    Fright.close_image(&Fright);
     exit(1);
   }
 
@@ -111,10 +111,10 @@ int main(int argc, char *argv[])
   for (i = 0; i < blocks; i++)
   {
     int delta = 0;
-    ltag = dc42_read_sector_tags(&Fleft, i);
-    rtag = dc42_read_sector_tags(&Fright, i);
-    ldata = dc42_read_sector_data(&Fleft, i);
-    rdata = dc42_read_sector_data(&Fright, i);
+    ltag = Fleft.read_sector_tags(&Fleft, i);
+    rtag = Fright.read_sector_tags(&Fright, i);
+    ldata = Fleft.read_sector_data(&Fleft, i);
+    rdata = Fright.read_sector_data(&Fright, i);
 
     if (!skiptags)
     {
@@ -228,8 +228,8 @@ int main(int argc, char *argv[])
 
   fprintf(stderr, "\ndone.\n");
 
-  dc42_close_image(&Fleft);
-  dc42_close_image(&Fright);
+  Fleft.close_image(&Fleft);
+  Fright.close_image(&Fright);
 
   return 0;
 }

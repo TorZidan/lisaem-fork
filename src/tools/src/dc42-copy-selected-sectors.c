@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open source image  %s because %s, %d\n", argv[1], Fsrc.errormsg, ret);
-    dc42_close_image(&Fsrc);
+    Fsrc.close_image(&Fsrc);
     exit(1);
   }
 
@@ -85,8 +85,8 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open dest image %s because %s, %d\n", argv[2], Fdest.errormsg, ret);
-    dc42_close_image(&Fsrc);
-    dc42_close_image(&Fdest);
+    Fsrc.close_image(&Fsrc);
+    Fdest.close_image(&Fdest);
     exit(1);
   }
 
@@ -104,38 +104,38 @@ int main(int argc, char *argv[])
 
     if (endptr[0] != 0)
     {
-      dc42_close_image(&Fsrc);
-      dc42_close_image(&Fdest);
+      Fsrc.close_image(&Fsrc);
+      Fdest.close_image(&Fdest);
       fprintf(stderr, "Could not parse parameter #%d: \"%s\"\n", i, argv[i]);
       exit(1);
     }
 
-    ltag = dc42_read_sector_tags(&Fsrc, sector);
-    ldata = dc42_read_sector_data(&Fsrc, sector);
+    ltag = Fsrc.read_sector_tags(&Fsrc, sector);
+    ldata = Fsrc.read_sector_data(&Fsrc, sector);
 
-    ret = dc42_write_sector_tags(&Fdest, sector, ltag);
+    ret = Fdest.write_sector_tags(&Fdest, sector, ltag);
     if (ret)
     {
       fprintf(stderr, "Failed to write tag to sector #%d\n", sector);
-      dc42_close_image(&Fsrc);
-      dc42_close_image(&Fdest);
+      Fsrc.close_image(&Fsrc);
+      Fdest.close_image(&Fdest);
       exit(10);
     }
 
-    ret = dc42_write_sector_data(&Fdest, sector, ldata);
+    ret = Fdest.write_sector_data(&Fdest, sector, ldata);
     if (ret)
     {
       fprintf(stderr, "Failed to write data to sector #%d\n", sector);
-      dc42_close_image(&Fsrc);
-      dc42_close_image(&Fdest);
+      Fsrc.close_image(&Fsrc);
+      Fdest.close_image(&Fdest);
       exit(10);
     }
 
     printf("Copied sector %d\n", sector);
   }
 
-  dc42_close_image(&Fsrc);
-  dc42_close_image(&Fdest);
+  Fsrc.close_image(&Fsrc);
+  Fdest.close_image(&Fdest);
 
   return 0;
 }

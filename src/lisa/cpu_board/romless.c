@@ -824,7 +824,7 @@ void romless_proread(void)
   {
     ALERT_LOG(0, "reading sector.");
 
-    blk = dc42_read_sector_data(&P->DC42, sectornumber);
+    blk = (&P->DC42)->read_sector_data(&P->DC42, sectornumber);
     if (!blk)
     {
       ALERT_LOG(0, "Read sector from blk#%d failed with error:%d %s", sectornumber, P->DC42.retval, P->DC42.errormsg);
@@ -841,7 +841,7 @@ void romless_proread(void)
         bootblockchecksum = ((bootblockchecksum << 1) | ((bootblockchecksum & 0x80000000) ? 1 : 0)) ^ blk[i] ^ i;
     }
 
-    blk = dc42_read_sector_tags(&P->DC42, sectornumber);
+    blk = (&P->DC42)->read_sector_tags(&P->DC42, sectornumber);
     if (!blk)
     {
       ALERT_LOG(0, "Read tags from blk#%d failed with error:%d %s", sectornumber, P->DC42.retval, P->DC42.errormsg);
@@ -927,7 +927,7 @@ void romless_twgread(void)
   }
   reg68k_regs[8 + 3] = 0x00FCDD81;
 
-  ptr = dc42_read_sector_data(F, sectornumber);
+  ptr = F->read_sector_data(F, sectornumber);
   if (!ptr)
   {
     DEBUG_LOG(0, "Could not read sector #%ld", sectornumber);
@@ -950,7 +950,7 @@ void romless_twgread(void)
       bootblockchecksum = ((bootblockchecksum << 1) | ((bootblockchecksum & 0x80000000) ? 1 : 0)) ^ ptr[i] ^ i;
   }
 
-  ptr = dc42_read_sector_tags(F, sectornumber);
+  ptr = F->read_sector_tags(F, sectornumber);
   if (!ptr)
   {
     ALERT_LOG(0, "failed");

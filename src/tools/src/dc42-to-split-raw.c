@@ -73,14 +73,14 @@ int main(int argc, char *argv[])
   {
     fprintf(stderr, "Could not create %s\n", rawout);
     perror("");
-    dc42_close_image(&F);
+    F.close_image(&F);
     exit(1);
   }
   if (!tag)
   {
     fprintf(stderr, "Could not create %s\n", rawtag);
     perror("");
-    dc42_close_image(&F);
+    F.close_image(&F);
     exit(1);
   }
 
@@ -93,11 +93,11 @@ int main(int argc, char *argv[])
 
   for (x = 0; x < F.numblocks; x++)
   {
-    data = dc42_read_sector_data(&F, x);
+    data = F.read_sector_data(&F, x);
     if (!data)
     {
       fprintf(stderr, "Could not read data for sector %d from image!\n", x);
-      dc42_close_image(&F);
+      F.close_image(&F);
       exit(2);
     }
     fwrite(data, F.sectorsize, 1, raw);
@@ -107,18 +107,18 @@ int main(int argc, char *argv[])
   {
     for (x = 0; x < F.numblocks; x++)
     {
-      tags = dc42_read_sector_tags(&F, x);
+      tags = F.read_sector_tags(&F, x);
       if (!tags)
       {
         fprintf(stderr, "Could not read tags for sector %d from image!\n", (int)x);
-        dc42_close_image(&F);
+        F.close_image(&F);
         exit(2);
       }
       fwrite(tags, F.tagsize, 1, tag);
     }
   }
 
-  dc42_close_image(&F);
+  F.close_image(&F);
   fclose(raw);
   fclose(tag);
   return 0;

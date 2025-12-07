@@ -72,11 +72,11 @@ int main(int argc, char *argv[])
   {
     FILE *f;
     char filename[24];
-    data = dc42_read_sector_data(&F, x);
+    data = F.read_sector_data(&F, x);
     if (!data)
     {
       fprintf(stderr, "Could not read data for sector %d from image!\n", x);
-      dc42_close_image(&F);
+      F.close_image(&F);
       exit(2);
     }
     snprintf(filename, 24, "sector-%04d.bin", x);
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
     {
       fprintf(stderr, "Could not create %s\n", filename);
       perror("");
-      dc42_close_image(&F);
+      F.close_image(&F);
       exit(1);
     }
     fwrite(data, F.sectorsize, 1, f);
@@ -99,11 +99,11 @@ int main(int argc, char *argv[])
     {
       FILE *f;
       char filename[24];
-      tags = dc42_read_sector_tags(&F, x);
+      tags = F.read_sector_tags(&F, x);
       if (!tags)
       {
         fprintf(stderr, "Could not read tags for sector %d from image!\n", (int)x);
-        dc42_close_image(&F);
+        F.close_image(&F);
         exit(2);
       }
       snprintf(filename, 24, "sector-%04d-tag.bin", x);
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
       {
         fprintf(stderr, "Could not create %s\n", filename);
         perror("");
-        dc42_close_image(&F);
+        F.close_image(&F);
         exit(1);
       }
       fwrite(tags, F.tagsize, 1, f);
@@ -120,6 +120,6 @@ int main(int argc, char *argv[])
     }
   }
 
-  dc42_close_image(&F);
+  F.close_image(&F);
   return 0;
 }

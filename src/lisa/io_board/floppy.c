@@ -813,7 +813,7 @@ static void do_floppy_read(DC42ImageType *F)
     //floppy_motor_sounds(floppy_ram[TRACK]); //JD commented out
 
     DEBUG_LOG(0, "reading data for sector:%d", sectornumber);
-    ptr = dc42_read_sector_data(F, sectornumber);
+    ptr = F->read_sector_data(F, sectornumber);
     if (!ptr)
     {
         ALERT_LOG(0, "Could not read sector #%ld ! \n", sectornumber);
@@ -830,7 +830,7 @@ static void do_floppy_read(DC42ImageType *F)
     }
 
     DEBUG_LOG(0, "reading tags for sector %d", sectornumber);
-    ptr = dc42_read_sector_tags(F, sectornumber);
+    ptr = F->read_sector_tags(F, sectornumber);
     if (ptr != NULL) {
         // Copy tagsize=12 bytes from the dc42 image into floppy_ram[], starting at location DISKDATAHDR=0x1f4=500
         memcpy(&floppy_ram[DISKDATAHDR], ptr, F->tagsize);
@@ -875,8 +875,8 @@ static void do_floppy_write(DC42ImageType *F)
 #endif
     DEBUG_LOG(0, "write floppy sector #%ld", sectornumber);
     //floppy_motor_sounds(floppy_ram[TRACK]); //JD commented out
-    dc42_write_sector_tags(F, sectornumber, &floppy_ram[DISKDATAHDR]);
-    dc42_write_sector_data(F, sectornumber, &floppy_ram[DISKDATASEC]);
+    F->write_sector_tags(F, sectornumber, &floppy_ram[DISKDATAHDR]);
+    F->write_sector_data(F, sectornumber, &floppy_ram[DISKDATASEC]);
     total_num_sectors_written++;
 }
 
@@ -1213,7 +1213,7 @@ void floppy_go6504(void)
 
         case FLOP_CMD_UCLAMP: // eject/close/unclamp disk image
             DEBUG_LOG(0, "Floppy eject queued on drive %02x \n", floppy_ram[DRIVE]);
-            dc42_close_image(F);
+            F->close_image(F);
             floppy_ram[0x20] = 0;
             RWTS_IRQ_SIGNAL(0);
             floppy_FDIR = 1;
@@ -1620,13 +1620,13 @@ void deserialize(DC42ImageType *F)
     uint32 plant, year, day, sn, prefix, net;
     get_lisa_serialnumber(&plant, &year, &day, &sn, &prefix, &net);
 
-    uint8 *mddftag = dc42_read_sector_tags(F, mdf_sector_num);
+    uint8 *mddftag = F->read_sector_tags(F, mdf_sector_num);
     if (F->retval!=0) {
         ALERT_LOG(0,"There was a problem reading tags at sector %d: %s. Will not attempt to deseriaize this floppy disk image.", mdf_sector_num, F->errormsg);
         return;
     }
 
-    uint8 *mddfsec = dc42_read_sector_data(F, mdf_sector_num);
+    uint8 *mddfsec = F->read_sector_data(F, mdf_sector_num);
     if (F->retval!=0) {
         ALERT_LOG(0,"There was a problem reading data at sector %d: %s. Will not attempt to deseriaize this floppy disk image.", mdf_sector_num, F->errormsg);
         return;
@@ -1663,7 +1663,7 @@ void deserialize(DC42ImageType *F)
                 uint8 buf[512];
                 memcpy(buf, mddfsec, 512);
                 buf[0xcc] = buf[0xcd] = buf[0xce] = buf[0xcf] = 0;
-                dc42_write_sector_data(F, 28, buf);
+                F->write_sector_data(F, 28, buf);
             }
         }
     } else {
@@ -1671,13 +1671,13 @@ void deserialize(DC42ImageType *F)
     }
 
     ////   Deserialize Lisa Office System Tools on diskettes //////////////////////////////////////////////////////////////////////////////////////
-    uint8 *ftag; //=dc42_read_sector_tags(F,28);
-    uint8 *fsec; //=dc42_read_sector_data(F,28);
+    uint8 *ftag; //=F->read_sector_tags(F,28);
+    uint8 *fsec; //=F->read_sector_data(F,28);
     int sec;
     for (sec = 32; sec < 128; sec++)
     {
         char name[64];
-        ftag = dc42_read_sector_tags(F, sec);
+        ftag = F->read_sector_tags(F, sec);
         //               ALERT_LOG(0,"Checking sector:%d fileid4=%02x",sec,ftag[4]);
         if (F->retval!=0) {
             ALERT_LOG(0,"There was a problem reading tags at sector %d: %s. Will not attempt to deseriaize this floppy disk image.", sec, F->errormsg);
@@ -1686,7 +1686,7 @@ void deserialize(DC42ImageType *F)
 
         if (ftag[4] == 0xff) // tool entry tags have tag 4 as ff, others do as well, but it's a good indicator
         {
-            fsec = dc42_read_sector_data(F, sec);
+            fsec = F->read_sector_data(F, sec);
             if (F->retval!=0) {
                 ALERT_LOG(0,"There was a problem reading data at sector %d: %s. Will not attempt to deseriaize this floppy disk image.", sec, F->errormsg);
                 return;
@@ -1721,7 +1721,7 @@ void deserialize(DC42ImageType *F)
                         uint8 buf[512];
                         memcpy(buf, fsec, 512);
                         buf[0x42] = buf[0x43] = buf[0x44] = buf[0x45] = buf[0x48] = buf[0x49] = 0;
-                        dc42_write_sector_data(F, sec, buf);
+                        F->write_sector_data(F, sec, buf);
                     }
                 }
             }
@@ -1753,7 +1753,7 @@ int floppy_insert(char *Image, uint8 insert_in_upper_floppy_drive) // emulator s
     // fprintf(buglog,"SRC:Opening Floppy Image file... %s\n",F->fname);
     errno = 0;
 
-    dc42_close_image(F);                  // close any previously opened disk image
+    F->close_image(F);                  // close any previously opened disk image
     err = dc42_auto_open(F, Image, "wb"); // for testing the emulator, open images as private "p"  w=writeable, b=best
     if (err)
     {

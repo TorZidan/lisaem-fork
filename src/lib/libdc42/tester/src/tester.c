@@ -28,7 +28,7 @@ void verify_sector(DC42ImageType *F, int i, int n)
   uint8 *data = NULL;
   uint8 *tags = NULL;
 
-  data = dc42_read_sector_data(F, i);
+  data = F->read_sector_data(F, i);
 
   if (!data)
   {
@@ -81,7 +81,7 @@ void verify_sector(DC42ImageType *F, int i, int n)
     }
   }
 
-  tags = dc42_read_sector_tags(F, i);
+  tags = F->read_sector_tags(F, i);
   if (!tags)
   {
     fprintf(stderr, "Could not read sector tags %i\n");
@@ -118,7 +118,7 @@ void verify_sector(DC42ImageType *F, int i, int n)
 
   if (e)
   {
-    dc42_close_image(F);
+    F->close_image(&F);
     exit(1);
   }
 }
@@ -141,7 +141,7 @@ void fill_sector(DC42ImageType *F, int i, int n)
     data[j + 6] = data[j + 2] ^ 0x5a;
     data[j + 7] = data[j + 3] ^ 0xaa;
   }
-  j = dc42_write_sector_data(F, i, data);
+  j = F->write_sector_data(F, i, data);
   if (j)
   {
     fprintf(stderr, "Error writing sector data %d\n", i);
@@ -159,7 +159,7 @@ void fill_sector(DC42ImageType *F, int i, int n)
     tags[j + 2] = n ^ x ^ ((i & 0x0000ff00) >> 8);
     tags[j + 3] = n ^ x ^ ((i & 0x000000ff));
   }
-  j = dc42_write_sector_tags(F, i, tags);
+  j = F->write_sector_tags(F, i, tags);
   if (j)
   {
     fprintf(stderr, "Error writing sector tags%d\n", i);
@@ -220,7 +220,7 @@ void test(char *dc42filename, int flag)
   for (i = 0; i < F.numblocks; i++)
     check_image_except_sector(&F, i, 0x22);
 
-  dc42_close_image(&F);
+  F.close_image(&F);
 }
 
 int main(int argc, char *argv[])

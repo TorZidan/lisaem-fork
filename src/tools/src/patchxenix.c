@@ -263,6 +263,6 @@ int main(int argc, char *argv[])
    printf("%s is %spatched to (b) not assert CMD before the BSY IRQ Enable\n", Image, (stat & 2 ? "un" : ""));
    printf("%s is %spatched to (c) assert CMD after the BSY IRQ Enable\n", Image, (stat & 4 ? "un" : ""));
 
-   dc42_close_image(&F);
+   F.close_image(&F);
    return 0;
 }

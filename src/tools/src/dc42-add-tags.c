@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open source image %s because %s, returned:%d\n", argv[1], Fsrc.errormsg, ret);
-    dc42_close_image(&Fsrc);
+    Fsrc.close_image(&Fsrc);
     exit(1);
   }
 
@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
   if (ret)
   {
     fprintf(stderr, "Could not open created target image %s because %s\n", argv[2], Ftarget.errormsg);
-    dc42_close_image(&Fsrc);
-    dc42_close_image(&Ftarget);
+    Fsrc.close_image(&Fsrc);
+    Ftarget.close_image(&Ftarget);
     exit(1);
   }
 
@@ -71,10 +71,10 @@ int main(int argc, char *argv[])
   fprintf(stderr, "copying blk: ");
   for (i = 0; i < Fsrc.numblocks; i++)
   {
-    data = dc42_read_sector_data(&Fsrc, i);
+    data = Fsrc.read_sector_data(&Fsrc, i);
 
-    ret = dc42_write_sector_tags(&Ftarget, i, tag);
-    ret1 = dc42_write_sector_data(&Ftarget, i, data);
+    ret = Ftarget.write_sector_tags(&Ftarget, i, tag);
+    ret1 = Ftarget.write_sector_data(&Ftarget, i, data);
 
     if (ret || ret1)
       fprintf(stderr, "Error writing to block %d of target\n", i);
@@ -86,8 +86,8 @@ int main(int argc, char *argv[])
 
   fprintf(stderr, "\ndone.\n");
 
-  dc42_close_image(&Fsrc);
-  dc42_close_image(&Ftarget);
+  Fsrc.close_image(&Fsrc);
+  Ftarget.close_image(&Ftarget);
 
   return 0;
 }

@@ -10097,37 +10097,40 @@ int initialize_all_subsystems(void)
     setstatusbar("Initializing Expansion Card Slots");
     memset(dualparallelrom, 0xff, 2048);
 
-    strncpy(tmp, CSTR(my_lisaconfig->dualrom), MAXPATHLEN - 1);
-    if (read_parallel_card_rom(tmp) == 0)
+    if (!my_lisaconfig->dualrom.IsEmpty())
     {
-      ALERT_LOG(0, "Connecting Dual Parallel Port Cards.");
-
-      if (my_lisaconfig->slot1.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot1.IsSameAs(_T("Dual Parallel"), false))
+      strncpy(tmp, CSTR(my_lisaconfig->dualrom), MAXPATHLEN - 1);
+      if (read_parallel_card_rom(tmp) == 0)
       {
-        ALERT_LOG(0, "Connecting slot 1");
-        connect_2x_parallel_to_slot(0);
-        connect_device_to_via(3, my_lisaconfig->s1h, &my_lisaconfig->s1hp, "/cardslot1/highpath");
-        connect_device_to_via(4, my_lisaconfig->s1l, &my_lisaconfig->s1lp, "/cardslot1/lowpath");
-      }
+        ALERT_LOG(0, "Connecting Dual Parallel Port Cards.");
 
-      if (my_lisaconfig->slot2.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot2.IsSameAs(_T("Dual Parallel"), false))
-      {
-        ALERT_LOG(0, "Connecting slot 2");
-        connect_2x_parallel_to_slot(1);
-        connect_device_to_via(5, my_lisaconfig->s2h, &my_lisaconfig->s2hp, "/cardslot2/highpath");
-        connect_device_to_via(6, my_lisaconfig->s2l, &my_lisaconfig->s2lp, "/cardslot2/lowpath");
-      }
+        if (my_lisaconfig->slot1.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot1.IsSameAs(_T("Dual Parallel"), false))
+        {
+          ALERT_LOG(0, "Connecting slot 1");
+          connect_2x_parallel_to_slot(0);
+          connect_device_to_via(3, my_lisaconfig->s1h, &my_lisaconfig->s1hp, "/cardslot1/highpath");
+          connect_device_to_via(4, my_lisaconfig->s1l, &my_lisaconfig->s1lp, "/cardslot1/lowpath");
+        }
 
-      if (my_lisaconfig->slot3.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot3.IsSameAs(_T("Dual Parallel"), false))
-      {
-        ALERT_LOG(0, "Connecting slot 3");
-        connect_2x_parallel_to_slot(2);
-        connect_device_to_via(7, my_lisaconfig->s3h, &my_lisaconfig->s3hp, "/cardslot3/highpath");
-        connect_device_to_via(8, my_lisaconfig->s3l, &my_lisaconfig->s3lp, "/cardslot3/lowpath");
+        if (my_lisaconfig->slot2.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot2.IsSameAs(_T("Dual Parallel"), false))
+        {
+          ALERT_LOG(0, "Connecting slot 2");
+          connect_2x_parallel_to_slot(1);
+          connect_device_to_via(5, my_lisaconfig->s2h, &my_lisaconfig->s2hp, "/cardslot2/highpath");
+          connect_device_to_via(6, my_lisaconfig->s2l, &my_lisaconfig->s2lp, "/cardslot2/lowpath");
+        }
+
+        if (my_lisaconfig->slot3.IsSameAs(_T("dualparallel"), false) || my_lisaconfig->slot3.IsSameAs(_T("Dual Parallel"), false))
+        {
+          ALERT_LOG(0, "Connecting slot 3");
+          connect_2x_parallel_to_slot(2);
+          connect_device_to_via(7, my_lisaconfig->s3h, &my_lisaconfig->s3hp, "/cardslot3/highpath");
+          connect_device_to_via(8, my_lisaconfig->s3l, &my_lisaconfig->s3lp, "/cardslot3/lowpath");
+        }
       }
+      else
+        ALERT_LOG(0, "Could not load dual parallel ROM: (%s)", tmp);
     }
-    else
-      ALERT_LOG(0, "Could not load dual parallel ROM: (%s)", tmp);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -10277,7 +10280,7 @@ extern "C" int pickprofilesize(char *filename, int allowexisting)
             filename[0] = 0; // clear return file
             messagebox("The selected file is either not a proper DC42 image, or it's not a ProFile/Widget image.", "Sorry Not a Lisa Hard Disk Image");
           }
-          dc42_close_image(&P);
+          P.close_image(&P);
           check = 0;
         }
         else // cancel selected, fall through and clear the file name.

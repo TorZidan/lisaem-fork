@@ -309,8 +309,12 @@ int dc42_check_checksums(DC42ImageType *F) // 0 if they match, 1 if tags, 2 if d
    return ((datachks != newdatachks) ? 2 : 0) | ((tagchks != newtagchks) ? 1 : 0);
 }
 
-int dc42_sync_to_disk(DC42ImageType *F) // recalc checksums and synchronize in-memory
-{                                       // disk image back to the disk.
+// like fsync, sync's writes back to file. Does
+// NOT write proper tag/data checksums, as that
+// would be too slow.  Call recalc_checksums yourself
+// when you need it, or call dc42_close_image.
+int dc42_sync_to_disk(DC42ImageType *F) 
+{
 
    DC42_CHECK_VALID_F(F);
    DC42_CHECK_WRITEABLE(F);
@@ -385,6 +389,7 @@ int dc42_close_image(DC42ImageType *F)
    return F->retval; // suppress dumb compiler warning
 }
 
+//This code is unused (in LisaEm and also in the command-line tools).
 int dc42_close_image_by_handle(DC42ImageType *F)
 {
    DC42_CHECK_VALID_F(F);
@@ -409,12 +414,12 @@ int dc42_close_image_by_handle(DC42ImageType *F)
 }
 
 // For file seeks
-#define GET_TAG_POS(x) (F->dc42seekstart + ((x) * F->tagsize) + F->tagstart)
-#define GET_DATA_POS(x) (F->dc42seekstart + ((x) * F->sectorsize) + F->sectoroffset)
+#define GET_TAG_POS(sectornumber) (F->dc42seekstart + ((sectornumber) * F->tagsize) + F->tagstart)
+#define GET_DATA_POS(sectornumber) (F->dc42seekstart + ((sectornumber) * F->sectorsize) + F->sectoroffset)
 
-// For in memory seeks
-#define GET_TAG_IDX(x) (((x) * F->tagsize) + F->tagstart)
-#define GET_DATA_IDX(x) (((x) * F->sectorsize) + F->sectoroffset)
+// For in-memory seeks in the RAM buffer
+#define GET_TAG_IDX(sectornumber) (((sectornumber) * F->tagsize) + F->tagstart)
+#define GET_DATA_IDX(sectornumber) (((sectornumber) * F->sectorsize) + F->sectoroffset)
 
 uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber)
 {
@@ -795,13 +800,21 @@ int dc42_is_valid_image(char *filename)
 
 int dc42_open(DC42ImageType *F, char *filename, char *options)
 {
-
+   // fprintf(stderr,"libdc42: Starting in dc42_open for filename:%s with options:%s\n",filename,options);
    int i, flag;
    long filesizetotal = 0;
    uint8 tempbuf[2048];
    F->dc42seekstart = 0;
    F->retval = 0;
    F->returnmsg[0] = 0;
+
+   // "configure" the functions in DC42ImageType that are used for reading/writing sectors and closing the image
+   F->read_sector_tags = dc42_read_sector_tags;
+   F->write_sector_tags = dc42_write_sector_tags;
+   F->read_sector_data = dc42_read_sector_data;
+   F->write_sector_data = dc42_write_sector_data;
+   F->close_image = dc42_close_image;
+   F->close_image_by_handle = dc42_close_image_by_handle;
 
    // copy the file name into the image structure for later use
    strncpy(F->fname, filename, FILENAME_MAX);
@@ -900,7 +913,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
    // tags start right after sector data
    F->tagstart = F->sectoroffset + (F->numblocks * F->sectorsize);
 
-   fprintf(stderr,"libdc42: Disk image numblocks=%d\n", F->numblocks);
+   // fprintf(stderr,"libdc42: Disk image numblocks=%d\n", F->numblocks);
    if (disk_encoding==0x54 || disk_format==0x01 || F->numblocks == 1702) 
    {
       F->maxtrk = 45;
@@ -979,7 +992,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
          break; //   if we have mmapped I/O in the OS, use that.
 #else
          F->mmappedio = 2;
-         break; //   otherwise, load the whole image in RAM.
+                  break; //   otherwise, load the whole image in RAM.
 #endif
 
       case 's':
@@ -1005,7 +1018,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
 
    if (F->readonly == 0)
    {
-
+      // Open the image file in read/write mode
       if (F->fd > 2)
          close(F->fd); // close the file and reopen it as possibly writeable
       if (F->fh)
@@ -1035,11 +1048,11 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
    }
    else
    {
-
+      // Open the image file in read-only mode
 #ifdef HAVE_MMAPEDIO
       if (F->mmappedio)
       {
-         errno = 0;
+                  errno = 0;
 
          F->RAM = mmap(0, F->size, PROT_READ | PROT_WRITE, MAP_PRIVATE, F->fd, 0); // read only/private  - fd is already opened rd only
          //{fprintf(stderr,"MMAPped READ-ONLY/PRIVATE image errno:%d\n",errno); fflush(stderr);}
@@ -1050,24 +1063,25 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
    if (F->mmappedio == 0)
    {
 
-      F->RAM = malloc((F->tagsize + F->sectorsize));
-
+      F->RAM = malloc((F->tagsize + F->sectorsize)); 
       //{fprintf(stderr,"Direct to disk image\n"); fflush(stderr);}
    }
-   if (F->mmappedio == 2)
+   if (F->mmappedio == 2) // "2" means "always use RAM, do not use mmapped I/O"
    {
-
+      // Allocate as much  RAM as the file size
       F->RAM = malloc(F->size);
       if (F->RAM)
       {
          int i;
          if (F->fd > 2)
          {
+            // Read the file into memory, on non-Windows OS:
             lseek(F->fd, F->dc42seekstart, SEEK_SET);
             i = read(F->fd, F->RAM, F->size);
          }
          if (F->fh)
          {
+            // Read the file into memory, on Windows:
             fseek(F->fh, F->dc42seekstart, SEEK_SET);
             i = fread(F->RAM, F->size, 1, F->fh);
          }
@@ -1095,6 +1109,7 @@ int dc42_open(DC42ImageType *F, char *filename, char *options)
    return F->retval; // silence compiler warning about lack of return value
 }
 
+//This code is unused (in LisaEm and also in the command-line tools).
 int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char *options)
 {
    int i;
@@ -1104,6 +1119,14 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
    // copy the file name into the image structure for later use
    strncpy(F->fname, "open handle", FILENAME_MAX);
    F->retval = 0;
+
+   // "configure" the functions in DC42ImageType that are used for reading/writing sectors and closing the image
+   F->read_sector_tags = dc42_read_sector_tags;
+   F->write_sector_tags = dc42_write_sector_tags;
+   F->read_sector_data = dc42_read_sector_data;
+   F->write_sector_data = dc42_write_sector_data;
+   F->close_image = dc42_close_image;
+   F->close_image_by_handle = dc42_close_image_by_handle;
 
    // open the image as read only and grab it's header - we re-open it as r/w later if everything's happy.
    F->fd = fd;
@@ -1501,8 +1524,16 @@ int dc42_create(char *filename, char *volname, uint32 datasize, uint32 tagsize) 
 }
 
 // This does not open an image, do not use this on an already opened image.
-
-int dc42_add_tags(char *filename, uint32 tagsize) // tagsize is in bytes.  for a 400K disk use 400*2*12 for tagsize
+// add tags to a dc42 image that lacks them.
+// if tagsize is zero adds 12 bytes of tags for
+// every 512 bytes of data.  Does not open the
+// image, can be used pre-emptively when opening
+// and image for access.  Call it with 0 as the tag
+// size before calling dc42 open to ensure it has tags.
+// does not open the image, may not be called
+// while theimage file is open.
+// tagsize is in bytes.  for a 400K disk use 400*2*12 for tagsize
+int dc42_add_tags(char *filename, uint32 tagsize) 
 {
    FILE *image;
    uint32 oldtagsize, olddatasize, filesize, newfilesize;

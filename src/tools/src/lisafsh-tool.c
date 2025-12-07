@@ -239,7 +239,7 @@ uint32 hex2long(uint8 *s)
 
 uint16 tagfileid(DC42ImageType *F, int mysect)
 {
-  uint8 *tag = dc42_read_sector_tags(F, mysect);
+  uint8 *tag = F->read_sector_tags(F, mysect);
   if (!tag)
     return 0;
   return ((tag[4] << 8) | (tag[5]));
@@ -247,7 +247,7 @@ uint16 tagfileid(DC42ImageType *F, int mysect)
 
 uint32 tagpair(DC42ImageType *F, int mysect, int offset)
 {
-  uint8 *tag = dc42_read_sector_tags(F, mysect);
+  uint8 *tag = F->read_sector_tags(F, mysect);
 
   // floppy?
   if (F->tagsize < 20)
@@ -325,7 +325,7 @@ void dump_mddf(FILE *out, DC42ImageType *F)
     {
       sect = sorttag[sector];
 
-      sec = (uint8 *)dc42_read_sector_data(F, sect); //&(sectors[sect*sectorsize]);
+      sec = (uint8 *) F->read_sector_data(F, sect); //&(sectors[sect*sectorsize]);
 
        if (TAGFILEID(sect)==TAG_MDDF)
        {
@@ -389,7 +389,7 @@ void get_allocation_bitmap(DC42ImageType *F)
     if (tagfileid(F, sector) == TAG_FREEBITMAP) // is this a bitmap block?
     {
       printf("Found allocation bitmap block at sector #%04x(%d)\n", sector, sector);
-      sec = (uint8 *)dc42_read_sector_data(F, sector);
+      sec = (uint8 *) F->read_sector_data(F, sector);
       // do all the bits in this block until we go over the # of max sectors.
       for (i = 0; i < F->datasize; i++) // ??? might need to change this to match offsets ????
       {
@@ -653,7 +653,7 @@ void get_dir_file_names(DC42ImageType *F)
   {
     if (TAGFILEID(mysect) == TAG_DIRECTORY)
     {
-      sec = (uint8 *)dc42_read_sector_data(F, mysect);
+      sec = (uint8 *) F->read_sector_data(F, mysect);
 
       for (int k = 0; k < 512 - 58; k++)
       {
@@ -678,7 +678,7 @@ void get_dir_file_names(DC42ImageType *F)
             uint16 nfid = (0x10000 - fid) & 0xffff;
             if ((nfid == fileid) && (fileid > 4 && fileid < 0x8000) && !proccessed[fileid])
             { // check filename for match, then get the rest of the fields.
-              uint8 *fsec = (uint8 *)dc42_read_sector_data(F, l);
+              uint8 *fsec = (uint8 *) F->read_sector_data(F, l);
               char inodename[33];
               uint8 len = fsec[0];
 
@@ -972,7 +972,7 @@ void extract_files(DC42ImageType *F)
   {
     sect = sorttag[sector]; // dump files from sectors in sorted order
     fileid = TAGFILEID(sect);
-    sec = (uint8 *)dc42_read_sector_data(F, sect);
+    sec = (uint8 *) F->read_sector_data(F, sect);
 
     if (fileid != oldfileid) // we have a file id we haven't seen before. open new file handles
     {
@@ -1066,7 +1066,7 @@ void extract_files(DC42ImageType *F)
           return;
         }
         // sec=&(sectors[sect*sectorsize]);
-        // sec=(uint8 *)dc42_read_sector_data(F,sect);
+        // sec=(uint8 *) F->read_sector_data(F, sect);
         fwrite(sec, 0xf0, 1, fh);
         fclose(fh);
         fh = NULL;
@@ -1082,7 +1082,7 @@ void extract_files(DC42ImageType *F)
 
         // write remainder of sector to the binary file
         // sec=&(sectors[sect*sectorsize+0xf0]);
-        sec = (uint8 *)dc42_read_sector_data(F, sect);
+        sec = (uint8 *) F->read_sector_data(F, sect);
         fwrite(sec + 0xf0, (F->datasize - 0xf0), 1, fb); // bug found by Rebecca Bettencourt
         if (errno)
         {
@@ -1205,7 +1205,7 @@ void extract_file_extents_from_tags(DC42ImageType *F)
   {
     sect = sorttag[sector]; // dump files from sectors in sorted order
     fileid = TAGFILEID(sect);
-    sec = (uint8 *)dc42_read_sector_data(F, sect);
+    sec = (uint8 *) F->read_sector_data(F, sect);
 
     if (fileid != oldfileid) // we have a file id we haven't seen before. open new file handles
     {
@@ -1459,7 +1459,7 @@ void getcommand(void)
   if (command == QUITCOMMAND)
   {
     puts("Quit: Closing image");
-    dc42_close_image(&F);
+    F.close_image(&F);
     puts("Bye");
     exit(0);
   }
@@ -1553,7 +1553,7 @@ void printsectheader(FILE *out, DC42ImageType *F, uint32 sector)
       fprintf(out, "            +0 +1 +2 +3 +4 +5 . +6 +7 +8 +9 +a +b +c +d +e +f+10+11+12+13\n");
 
     fprintf(out, "tags:       ");
-    hexprint(out, (char *)dc42_read_sector_tags(F, sector), F->tagsize, 0);
+    hexprint(out, (char *)F->read_sector_tags(F, sector), F->tagsize, 0);
 
     if (F->tagsize == 12)
       fprintf(out, "\n           |volid| ??  |fileid|absnext|next|previous\n");
@@ -1590,7 +1590,7 @@ void printtag(FILE *out, DC42ImageType *F, uint32 sector)
   }
 
   fprintf(out, "%4d(%04x): ", sector, sector);
-  hexprint(out, (char *)dc42_read_sector_tags(F, sector), F->tagsize, 0);
+  hexprint(out, (char *)F->read_sector_tags(F, sector), F->tagsize, 0);
   fprintf(out, " %s\n", s);
 }
 
@@ -1610,7 +1610,7 @@ void printsector(FILE *out, DC42ImageType *F, uint32 sector, uint32 sectorsize)
 
   printsectheader(out, F, sector);
   // sec=&(sectors[sector*sectorsize]);
-  sec = (char *)dc42_read_sector_data(F, sector);
+  sec = (char *) F->read_sector_data(F, sector);
   for (i = 0; i < F->datasize; i += dispsize)
   {
     fprintf(out, "%04x: ", i);
@@ -1855,7 +1855,7 @@ void cli(DC42ImageType *F)
         break;
       }
       // read the sector into a buffer
-      memcpy(mysector, dc42_read_sector_data(F, sector), F->datasize);
+      memcpy(mysector, F->read_sector_data(F, sector), F->datasize);
 
       // modify
       {
@@ -1864,7 +1864,7 @@ void cli(DC42ImageType *F)
           mysector[i] = hargs[j];
       }
       // write
-      i = dc42_write_sector_data(F, sector, mysector);
+      i = F->write_sector_data(F, sector, mysector);
       printsector(stdout, F, sector, F->datasize);
       if (i)
         printf("Results:%d :%s\n", i, F->errormsg);
@@ -1888,7 +1888,7 @@ void cli(DC42ImageType *F)
         break;
       }
       // read the sector into a buffer
-      memcpy(mytag, dc42_read_sector_tags(F, sector), F->tagsize);
+      memcpy(mytag, F->read_sector_tags(F, sector), F->tagsize);
 
       { // modify
         unsigned int i;
@@ -1896,7 +1896,7 @@ void cli(DC42ImageType *F)
           mytag[i] = hargs[j];
       }
       // write
-      i = dc42_write_sector_tags(F, sector, mytag);
+      i = F->write_sector_tags(F, sector, mytag);
       if (i)
         printf("****WARNING, WRITE FAILED!****\n");
 
@@ -1926,7 +1926,7 @@ void cli(DC42ImageType *F)
       fseek(binfile, offset, SEEK_SET);
       x = fread(mysector, F->datasize, 1, binfile);
       fclose(binfile);
-      i = dc42_write_sector_data(F, sector, mysector);
+      i = F->write_sector_data(F, sector, mysector);
       printsector(stdout, F, sector, F->datasize);
     }
     break;
@@ -1959,7 +1959,7 @@ void cli(DC42ImageType *F)
 
       while (fread(mysector, F->datasize, 1, binfile) && sector < F->numblocks && !feof(binfile) && !ferror(binfile))
       {
-        i = dc42_write_sector_data(F, sector, mysector); // write the data tothe sector
+        i = F->write_sector_data(F, sector, mysector); // write the data tothe sector
         printf("Loaded %d bytes into sector:%d from file offset:%ld\n", F->datasize, sector, offset);
         sector++;                // prepare next sector to load
         offset = ftell(binfile); // grab next offset addr so we can print it
@@ -2062,11 +2062,11 @@ void cli(DC42ImageType *F)
 
             if (newoffset == 0x7c && (sector_number < F->numblocks || sector_number == 0xffffffff))
             {
-              i = dc42_write_sector_tags(F, sector_number + 1, tags);
+              i = F->write_sector_tags(F, sector_number + 1, tags);
               if (i)
                 printf("Wrote sector #%ld tags as sector #%ld tags status:%d %s", sector_number, sector_number + 1, i, F->errormsg);
 
-              i = dc42_write_sector_data(F, sector_number + 1, mysector);
+              i = F->write_sector_data(F, sector_number + 1, mysector);
               if (i)
                 printf("Wrote sector #%ld as sector #%ld status:%d %s", sector_number, sector_number + 1, i, F->errormsg);
             }
@@ -2160,8 +2160,8 @@ void cli(DC42ImageType *F)
         {
           if (tagsize)
           {
-            img1 = dc42_read_sector_tags(F, sec);
-            img2 = dc42_read_sector_tags(&F2, sec);
+            img1 = F->read_sector_tags(F, sec);
+            img2 = F->read_sector_tags(&F2, sec);
             if (img1 != NULL && img2 != NULL)
               for (i = 0; i < tagsize; i++)
                 if (img1[i] != img2[i])
@@ -2173,8 +2173,8 @@ void cli(DC42ImageType *F)
 
           if (secsize)
           {
-            img1 = dc42_read_sector_data(F, sec);
-            img2 = dc42_read_sector_data(&F2, sec);
+            img1 = F->read_sector_data(F, sec);
+            img2 = F2.read_sector_data(&F2, sec);
             if (img1 != NULL && img2 != NULL)
               for (i = 0; i < secsize; i++)
                 if (img1[i] != img2[i])
@@ -2186,7 +2186,7 @@ void cli(DC42ImageType *F)
           }
         }
 
-      dc42_close_image(&F2);
+      F2.close_image(&F2);
       if (!differs)
         puts("Sectors and tags between these images are identical.");
     }
@@ -2210,7 +2210,7 @@ void cli(DC42ImageType *F)
     case QUIT_CMD:
     {
       fprintf(stderr, "Closing Disk Image\n");
-      dc42_close_image(F);
+      F->close_image(&F);
       fprintf(stderr, "bye.\n");
       exit(0);
     }
@@ -2481,6 +2481,6 @@ int main(int argc, char *argv[])
 
   // printf("Pointer to RAM:%p",F.RAM);
   cli(&F);
-  dc42_close_image(&F);
+  F.close_image(&F);
   return 0;
 }
