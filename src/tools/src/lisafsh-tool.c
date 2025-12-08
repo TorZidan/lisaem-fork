@@ -2161,7 +2161,7 @@ void cli(DC42ImageType *F)
           if (tagsize)
           {
             img1 = F->read_sector_tags(F, sec);
-            img2 = F->read_sector_tags(&F2, sec);
+            img2 = F2.read_sector_tags(&F2, sec);
             if (img1 != NULL && img2 != NULL)
               for (i = 0; i < tagsize; i++)
                 if (img1[i] != img2[i])

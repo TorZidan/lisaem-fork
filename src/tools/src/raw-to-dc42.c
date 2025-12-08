@@ -28,10 +28,10 @@ long interleave5(long sector)
   return offset[sector & 31] + sector - (sector & 31);
 }
 
+// This is another, simplified way to do the interleaving above (currently unused)
 long interleave5_another_way(int sector)
 {
 	int offset_delta[] = {0, 4, 8, 12, 0, 4, 8, -4, 0, 4, -8, -4, 0, -12, -8, -4};
-
 	return sector + offset_delta[(sector % 16)];
 }
 
@@ -66,10 +66,6 @@ void help(void)
 
 int main(int argc, char *argv[])
 {
-  interleave_deinterleave_test();
-  return 0;
-
-
   int argn = 1;
   long numblocks, i, b;
   FILE *raw;
