@@ -1213,7 +1213,8 @@ void floppy_go6504(void)
 
         case FLOP_CMD_UCLAMP: // eject/close/unclamp disk image
             DEBUG_LOG(0, "Floppy eject queued on drive %02x \n", floppy_ram[DRIVE]);
-            F->close_image(F);
+            if (F->close_image) // ensure function pointer is valid before calling it
+                F->close_image(F);
             floppy_ram[0x20] = 0;
             RWTS_IRQ_SIGNAL(0);
             floppy_FDIR = 1;
@@ -1753,7 +1754,9 @@ int floppy_insert(char *Image, uint8 insert_in_upper_floppy_drive) // emulator s
     // fprintf(buglog,"SRC:Opening Floppy Image file... %s\n",F->fname);
     errno = 0;
 
-    F->close_image(F);                  // close any previously opened disk image
+    if (F->close_image) // ensure function pointer is valid before calling it
+        F->close_image(F); // close any previously opened disk image
+
     err = dc42_auto_open(F, Image, "wb"); // for testing the emulator, open images as private "p"  w=writeable, b=best
     if (err)
     {
@@ -1783,14 +1786,16 @@ int floppy_insert(char *Image, uint8 insert_in_upper_floppy_drive) // emulator s
     if (F->numblocks == 1440 || F->numblocks == 2880 || F->numblocks == 5760)
     {
         messagebox("Yuck! I can't swallow MFM (720K/1.44M/2.88M) floppies, those are for PC's", "Wrong kind of floppy");
-        dc42_close_image(F);
+        if (F->close_image) // ensure function pointer is valid before calling it
+            F->close_image(F);
         return -1;
     }
 
     if (F->numblocks > 1742)
     {
         messagebox("That's a very strangely sized disk!", "Wrong kind of floppy");
-        dc42_close_image(F);
+        if (F->close_image) // ensure function pointer is valid before calling it
+            F->close_image(F);
         return -1;
     }
 
@@ -1912,17 +1917,15 @@ void floppy_eject_button_pressed(uint8 on_upper_floppy_drive)
 
 void init_floppy(long iorom)
 {
-    current_upper_floppy_image.RAM = NULL;
-    current_upper_floppy_image.fd = -1;
-    current_upper_floppy_image.fh = NULL;
-
-    current_lower_floppy_image.RAM = NULL;
-    current_lower_floppy_image.fd = -1;
-    current_lower_floppy_image.fh = NULL;
+    memset(&current_upper_floppy_image, 0, sizeof(DC42ImageType));
+    memset(&current_lower_floppy_image, 0, sizeof(DC42ImageType));
 
     floppy_FDIR = 0;
     fdir_timer = -1;
     floppy_6504_wait = 0;
+
+    total_num_sectors_read = 0;
+    total_num_sectors_written = 0;
 
     // memset(floppy_ram,0,1024);             // clear ram
     //  load_pram();                          // obsolete - let Lisaconfig handle this
