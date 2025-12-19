@@ -140,7 +140,7 @@ LisaConfigFrame::LisaConfigFrame(const wxString &title, LisaConfig *lisaconfig)
     pportopts[1] = wxT("ADMP");
     pportopts[2] = wxT("Nothing");
 
-    wpportopts[0] = wxT("Widget-10");
+    wpportopts[0] = wxT("Widget");
     wpportopts[1] = wxT("ADMP");
     wpportopts[2] = wxT("Nothing");
 
@@ -812,20 +812,12 @@ wxPanel *LisaConfigFrame::CreatePortsConfigPage(wxNotebook *parent)
 
     y += ya * 2;
 
-    if (floppy_iorom != 0x88)
-    {
-        pportbox = new wxRadioBox(panel, wxID_ANY,
-                                  wxT("Parallel Port:"), wxPoint(10, y), wxDefaultSize, 3, pportopts, 0, wxRA_SPECIFY_COLS,
+    pportbox = new wxRadioBox(panel, wxID_ANY,
+                                  wxT("Parallel Port:"), wxPoint(10, y), wxDefaultSize, 3, 
+                                  (floppy_iorom == 0x88)? wpportopts:pportopts, // Display "Profile" or "Widget" on the radio button, depending on the IO ROM version.
+                                  0, wxRA_SPECIFY_COLS,
                                   wxDefaultValidator, wxT("radioBox"));
-        my_lisaconfig->parallelp.Replace(_T("widget"), _T("profile"), true);
-    }
-    else
-    {
-        pportbox = new wxRadioBox(panel, wxID_ANY,
-                                  wxT("Parallel Port:"), wxPoint(10, y), wxDefaultSize, 1, wpportopts, 0, wxRA_SPECIFY_COLS,
-                                  wxDefaultValidator, wxT("radioBox"));
-        my_lisaconfig->parallelp.Replace(_T("profile"), _T("widget"), true);
-    }
+
     y += ya * 2;
 
     // default to profile for builtin parallel port
@@ -960,8 +952,8 @@ void LisaConfigFrame::OnPickProFile(wxCommandEvent &WXUNUSED(event))
 {
     wxFileDialog open(this, wxT("Store ProFile drive as:"),
                       wxEmptyString,
-                      (floppy_iorom == 0x88) ? wxT("lisaem-widget.dc42") : wxT("lisaem-profile.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("lisaem-profile.dc42"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       (long int)wxFD_SAVE, wxDefaultPosition);
 
     if (open.ShowModal() == wxID_OK)
@@ -975,7 +967,7 @@ void LisaConfigFrame::OnPickProFile1H(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on upper port of Slot 1 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s1h.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
     if (open.ShowModal() == wxID_OK)
         m_text_propathh[1]->SetValue(open.GetPath());
@@ -986,7 +978,7 @@ void LisaConfigFrame::OnPickProFile1L(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on lower port of Slot 1 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s1l.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
     if (open.ShowModal() == wxID_OK)
         m_text_propathl[1]->SetValue(open.GetPath());
@@ -999,7 +991,7 @@ void LisaConfigFrame::OnPickProFile2H(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on upper port of Slot 2 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s2h.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
 
     if (open.ShowModal() == wxID_OK)
@@ -1011,7 +1003,7 @@ void LisaConfigFrame::OnPickProFile2L(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on lower port of Slot 2 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s2l.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
 
     if (open.ShowModal() == wxID_OK)
@@ -1024,7 +1016,7 @@ void LisaConfigFrame::OnPickProFile3H(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on upper port of Slot 3 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s3h.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
 
     if (open.ShowModal() == wxID_OK)
@@ -1036,7 +1028,7 @@ void LisaConfigFrame::OnPickProFile3L(wxCommandEvent &WXUNUSED(event))
     wxFileDialog open(NULL, wxT("Create ProFile drive on lower port of Slot 3 as:"),
                       wxEmptyString,
                       wxT("lisaem-profile-s3l.dc42"),
-                      wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                      wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                       wxFD_SAVE);
 
     if (open.ShowModal() == wxID_OK)

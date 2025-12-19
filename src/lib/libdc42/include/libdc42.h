@@ -337,14 +337,14 @@ struct DC42ImageType {
 
   uint8 ftype; // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
 
-  uint32 tagsize;  // must set to 12 - expect ProFile/Widget to use 24 byte tags
-  uint32 datasize; // must set to 512
+  uint32 tagsize;  // 12 for floppy disk images, 20 for ProFile/Widget hard disk images
+  uint32 datasize; // must set to 512. TODO: remove this attribute and use sectorsize instead
 
   uint32 datasizetotal; // data size (in bytes of all sectors added together)
   uint32 tagsizetotal;  // tag size total in bytes
 
   uint32 sectoroffset; // how far into the file is the 1st sector
-  uint16 sectorsize;   // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
+  uint16 sectorsize;   // must set to 512 
   uint32 tagstart;     // how far into the file to 1st tag - similar to sectoroffset
 
   uint32 maxtrk, maxsec, maxside, numblocks; // unused by these routines, but used by the Lisa Emulator
@@ -424,5 +424,7 @@ int dc42_extract_macbinii(char *infilename); // extracts macbin2 header if one e
 
 int searchseccount(DC42ImageType *F, int sector, int size, uint8 *s);
 int replacesec(DC42ImageType *F, int sector, int size, uint8 *s, uint8 *r);
+
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options);
 
 ////////////// headers ///////////////////////////////////////////////////////////////////////////////////////////////////////////////

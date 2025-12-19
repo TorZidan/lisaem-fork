@@ -28,10 +28,9 @@
 \**************************************************************************************/
 
 #define IN_PROFILE_C
-#include <vars.h>
 
-// what's the size of a Profile image file header (so we can skip the start when doing data...)
-#define PROFILE_IMG_HEADER_SIZE 2048
+// this also includes libdc42.h
+#include <vars.h>
 
 #define PROFILE_WAIT_EXEC_CYCLE 3 // #of ProFile Loops to wait after got 55 before we return results to Lisa
 
@@ -121,6 +120,11 @@ char ProFile_Spare_table[536] =
 
 void ProfileReset(ProFileType *P);
 void ProfileResetOff(ProFileType *P);
+
+// Keep stats here. They do not get reset until the emulator is restarted. 
+// The stats are for ALL attached Profile drives, combined (usually there is just one).
+uint32 profile_total_num_sectors_read = 0;
+uint32 profile_total_num_sectors_written = 0;
 
 #ifdef DEBUG
 
@@ -257,12 +261,6 @@ void append_profile_log(int level, char *s, ...)
     }
 
 #endif
-
-long interleave5(long sector)
-{
-    static const int offset[] = {0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11, 16, 21, 26, 31, 20, 25, 30, 19, 24, 29, 18, 23, 28, 17, 22, 27};
-    return offset[sector & 31] + sector - (sector & 31);
-}
 
 long deinterleave5(long sector)
 {
@@ -430,6 +428,7 @@ void do_profile_read(ProFileType *P, uint32 block)
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     errno = 0;
     blk = (P->DC42).read_sector_data(&(P->DC42), block);
+    profile_total_num_sectors_read++;
 
     if (P->DC42.retval || blk == NULL)
     {
@@ -556,6 +555,7 @@ void do_profile_write(ProFileType *P, uint32 block)
 
     // fprintf(stderr,"ProFile write to %ld %d bytes\n",block,P->DC42.datasize);
     (P->DC42).write_sector_data(&P->DC42, block, &(P->DataBlock[4 + 6 + P->DC42.tagsize]));
+    profile_total_num_sectors_written++;
     if (P->DC42.retval)
     {
         DEBUG_LOG(0, "Write sector from blk#%d failed with error:%d %s", block, P->DC42.retval, P->DC42.errormsg);
@@ -607,6 +607,9 @@ void init_Profiles(void)
     ProfileReset(via[6].ProFile);
 
     // ProFileType profiles[7]; -- no need these are attached to the VIA's, so it's via[x]->Profile. *Burp*
+
+    profile_total_num_sectors_read = 0;
+    profile_total_num_sectors_written = 0;
 }
 
 extern void update_profile_preferences_path(char *newfilename);
@@ -620,7 +623,8 @@ void profile_unmount(void)
         if (via[i].ProFile)
         {
             ALERT_LOG(0, "Shutting down profile at via #%d for shutdown/reboot. dc42:%p", i, via[i].ProFile->DC42);
-            (&via[i].ProFile->DC42)->close_image(&via[i].ProFile->DC42);
+            if ((&via[i].ProFile->DC42)->close_image) // ensure function pointer is valid before calling it
+                (&via[i].ProFile->DC42)->close_image(&via[i].ProFile->DC42);
         }
     }
 }
@@ -628,24 +632,27 @@ void profile_unmount(void)
 int profile_mount(char *filename, ProFileType *P)
 {
     int i;
+    int file_name_len = strlen(filename);
 
     // Open the profile - if it doesn't exist, create it.
     // 9728+1 - 5mb profile + space for spare table at -1.
 
-    ALERT_LOG(0, "Attempting to open profile:%s", filename);
+    ALERT_LOG(0, "Attempting to open profile file name:%s", filename);
 #ifndef __MSVCRT__
-    i = dc42_open(&P->DC42, filename, "wb");
+    i = dc42_open(&P->DC42, filename, "wb"); // On non-windows platforms: w=open in read/write mode, b=make best choice for mmapped I/O or RAM
 #else
-    i = dc42_open(&P->DC42, filename, "wn"); // win32
+    i = dc42_open(&P->DC42, filename, "wn"); // On win32 platforms: w=open in read/write mode, n=never use mmapped I/O, nor RAM (actually it uses just 532 bytes of F->RAM, to read 1 sector at a time).
 #endif
-    if (i)
+    
+    if (i == -6)
     {
+        // could not open, likely file does not exist. Prompt user to create a new profile image and ask what size .
         int sz;
         int blocks[] = {9728, 19456, 32768, 40960, 65536, 81920, 131072};
         //               0     1     2     3     4     5     6
         //              5M   10M   16M   20M   32M   40M    64M
 
-        ALERT_LOG(0, "Did not find %s, asking user what size drive to create", filename);
+        ALERT_LOG(0, "Call to dc42_open open returned error -6 (most likely the file was not found); the error message is:%s . Now asking user what size new file to create ...", P->DC42.errormsg);
         sz = pickprofilesize(filename, 1);
         if (sz < -1 || sz > 6)
             return -1;
@@ -655,22 +662,53 @@ int profile_mount(char *filename, ProFileType *P)
             ALERT_LOG(0, "User chose to select an existing profile instead");
             update_profile_preferences_path(filename);
             i = dc42_open(&P->DC42, filename, "wm");
+            if (i)
+            {
+                ALERT_LOG(0, "Failed to open existing ProFile drive after user selected it!");
+                messagebox(P->DC42.errormsg, "File Error");
+            }
             return (i ? -1 : 0);
         }
 
+        // Create the new empty profile image file:
         i = dc42_create(filename, "-lisaem.sunder.net hd-", blocks[sz] * 512, blocks[sz] * 20);
         i = dc42_open(&P->DC42, filename, "wm");
         if (i)
         {
             ALERT_LOG(0, "Failed to open newly created ProFile drive!");
+            messagebox("Could not open the new ProFile image file!", "File Error");
+            return -1;
+        }
+    } 
+    else if (i)
+    {
+        // We got an error, most-likely error 88, which means that the file is not in valid dc42 format.
+        // Now open it as a raw profile image file.
+        // Note: there is no way to validate here if the file is a valid raw profile image file. It if boots up, then it is.
+        ALERT_LOG(0, "dc42_open() of file name %s returned error %d, the error message is:%s. Now will open the file in raw profile format ...", filename, i, P->DC42.errormsg);
+        if (file_name_len > 6 && strcasecmp(filename + file_name_len - 6, ".image") != 0)
+        {
+            char message[1024];
+            // If the file extension is not .image, warn the user that ha may be doing something wrong.
+            snprintf(message, sizeof(message),
+                     "The Profile image file '%s' is not a valid dc42 image file. Will attempt to open it as a raw profile image file, "
+                     "even though its extension is not recognized (is not .image).\n\nTo avoid this warning in the future, "
+                     "please rename the file to have a '.image' extension and then update its name in File->Preferences, tab 'ports'.",
+                     filename);
+            messagebox(message, "Warning: unrecognized file name extension");
+        }   
+
+#ifndef __MSVCRT__
+        i = raw_profile_image_open(&P->DC42, filename, "wb");
+#else
+        i = raw_profile_image_open(&P->DC42, filename, "wn"); // win32        
+#endif 
+        if (i) {
+            messagebox(P->DC42.errormsg, "File Error");
+            return -1;
         }
     }
-
-    if (i)
-        return -1;
-    // 9690blks ~~5mb?               9728-9690= 38
-    // 19448blks ~~10mb?            19448+38 = 19486      likely is 19486 blocks.
-
+    ALERT_LOG(0, "Profile image %s opened successfully. Returning 0.", filename);
     return 0;
 }
 

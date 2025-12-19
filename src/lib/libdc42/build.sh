@@ -83,7 +83,7 @@ then
 fi
 
 CHECKDIRS include lib obj resources src
-CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h src/libdc42.c resources/libdc42-banner.png
+CHECKFILES libdc42-lgpl-license.txt libdc42-gpl-license.txt include/libdc42.h src/libdc42.c src/lib_raw_profile_image.c resources/libdc42-banner.png
 
 # Parse command line options if any, overriding defaults.
 #echo parsing options
@@ -278,9 +278,16 @@ COMPILED=""
 if needed libdc42.c ../obj/libdc42.o || needed libdc42.c ../lib/libdc42.a; then
    qjob "!!  Compiled libdc42.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c libdc42.c -o ../obj/libdc42.o || exit 1
    waitqall
+fi
 
-   echo "  Making libdc42.a library..." 1>&2
-   makelibs  ../lib libdc42 "${VERSION}" static ../obj/libdc42.o
+if needed lib_raw_profile_image.c ../obj/lib_raw_profile_image.o || needed lib_raw_profile_image.c ../lib/libdc42.a; then
+   qjob "!!  Compiled lib_raw_profile_image.c..." $CC -W $WARNINGS -Wstrict-prototypes $INC -Wno-format -Wno-unused  $WITHDEBUG $WITHTRACE $ARCH $CFLAGS -c lib_raw_profile_image.c -o ../obj/lib_raw_profile_image.o || exit 1
+   waitqall
+fi
+
+if needed ../obj/libdc42.o ../lib/libdc42.a || needed ../obj/lib_raw_profile_image.o ../lib/libdc42.a; then
+    echo "  Making libdc42.a library..." 1>&2
+    makelibs  ../lib libdc42 "${VERSION}" static "../obj/libdc42.o ../obj/lib_raw_profile_image.o"
 fi
 
 cd ..

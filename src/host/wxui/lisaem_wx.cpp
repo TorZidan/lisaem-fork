@@ -266,6 +266,9 @@ extern "C" uint8 is_lower_floppy_currently_inserted(void);
 // defined in in floppy.c:
 extern uint32 total_num_sectors_read;
 extern uint32 total_num_sectors_written;
+// defined in profile.c:
+extern uint32 profile_total_num_sectors_read;
+extern uint32 profile_total_num_sectors_written;
 
 void iw_check_finish_job(void);
 
@@ -1808,7 +1811,7 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     }
 
     text.Printf(_T("CPU: %1.2f%s want:%1.2fMHz tick:%d, video refresh:%1.2f%s %c contrast:%02x %s %x%x:%x%x:%x%x.%x @%d/%08x "
-        "clk_cycles:%lld Floppy_sectors_R/W:%d/%d"),
+        "clk_cycles:%lld  Floppy_sectors_R/W:%d/%d  Profile_sectors_R/W:%d/%d"),
         mhzactual, c, throttle, emulation_tick,
         vidhz, s, (videoramdirty ? 'd' : ' '),
         contrast,
@@ -1818,7 +1821,8 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
         lisa_clock.secs_h, lisa_clock.secs_l,
         lisa_clock.tenths,
         context, pc24, cpu68k_clocks,
-        total_num_sectors_read, total_num_sectors_written
+        total_num_sectors_read, total_num_sectors_written,
+        profile_total_num_sectors_read, profile_total_num_sectors_written
       );
 
     SetStatusBarText(text);
@@ -9412,14 +9416,9 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
                                        _T("lisaem-s2l-profile.dc42"),
                                        _T("lisaem-s3h-profile.dc42"),
                                        _T("lisaem-s3l-profile.dc42")};
-        static const wxString widget = "lisaem-widget";
-
         if (v > 1 && v < 9)
         {
-          if (v == 2 && my_lisaconfig->iorom == 0x88)
-            *file = wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + widget;
-          else
-            *file = wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + def[v];
+          *file = wxStandardPaths::Get().GetAppDocumentsDir() + wxFILE_SEP_PATH + def[v];
         }
         else
           return; // invalid via index
@@ -10263,7 +10262,7 @@ extern "C" int pickprofilesize(char *filename, int allowexisting)
         wxFileDialog open(my_lisaframe, wxT("Select an ProFile hard drive image"),
                           wxEmptyString,
                           wxEmptyString,
-                          wxT("Disk Copy (*.dc42)|*.dc42|All (*.*)|*.*"),
+                          wxT("Disk Image (*.dc42;*.image)|*.dc42;*.image|All (*.*)|*.*"),
                           (long int)wxFD_OPEN, wxDefaultPosition);
 
         if (open.ShowModal() == wxID_OK)
