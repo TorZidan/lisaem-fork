@@ -429,7 +429,7 @@ void do_profile_read(ProFileType *P, uint32 block)
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     errno = 0;
-    blk = dc42_read_sector_data(&(P->DC42), block);
+    blk = (P->DC42).read_sector_data(&(P->DC42), block);
 
     if (P->DC42.retval || blk == NULL)
     {
@@ -446,7 +446,7 @@ void do_profile_read(ProFileType *P, uint32 block)
             bootblockchecksum = ((bootblockchecksum << 1) | ((bootblockchecksum & 0x80000000) ? 1 : 0)) ^ blk[i] ^ i;
     }
 
-    blk = dc42_read_sector_tags(&(P->DC42), block);
+    blk = (P->DC42).read_sector_tags(&(P->DC42), block);
 
     if (block == 0)
     {
@@ -555,13 +555,13 @@ void do_profile_write(ProFileType *P, uint32 block)
     errno = 0;
 
     // fprintf(stderr,"ProFile write to %ld %d bytes\n",block,P->DC42.datasize);
-    dc42_write_sector_data(&P->DC42, block, &(P->DataBlock[4 + 6 + P->DC42.tagsize]));
+    (P->DC42).write_sector_data(&P->DC42, block, &(P->DataBlock[4 + 6 + P->DC42.tagsize]));
     if (P->DC42.retval)
     {
         DEBUG_LOG(0, "Write sector from blk#%d failed with error:%d %s", block, P->DC42.retval, P->DC42.errormsg);
     }
 
-    dc42_write_sector_tags(&P->DC42, block, &(P->DataBlock[4 + 6]));
+    (P->DC42).write_sector_tags(&P->DC42, block, &(P->DataBlock[4 + 6]));
     if (P->DC42.retval)
     {
         DEBUG_LOG(0, "Write tags from blk#%d failed with error:%d %s", block, P->DC42.retval, P->DC42.errormsg);
@@ -620,7 +620,7 @@ void profile_unmount(void)
         if (via[i].ProFile)
         {
             ALERT_LOG(0, "Shutting down profile at via #%d for shutdown/reboot. dc42:%p", i, via[i].ProFile->DC42);
-            dc42_close_image(&via[i].ProFile->DC42);
+            (&via[i].ProFile->DC42)->close_image(&via[i].ProFile->DC42);
         }
     }
 }

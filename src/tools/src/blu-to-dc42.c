@@ -158,18 +158,18 @@ int main(int argc, char *argv[])
     i = read(blu, block, blocksize);
     if (i != blocksize)
     {
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       fprintf(stderr, "                                                               \rError.\n");
       close(blu);
       fprintf(stderr, "\nError reading block # %d, fread size did not return a %d bytes block, got %d blocks!\n", b, blocksize, i);
       exit(1);
     }
 
-    i = dc42_write_sector_data(&profile, b, (uint8 *)(&block[0]));
+    i = profile.write_sector_data(&profile, b, (uint8 *)(&block[0]));
     if (i)
     {
       fprintf(stderr, "\n\nError writing block data %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
 
@@ -196,16 +196,16 @@ int main(int argc, char *argv[])
       }
     }
 
-    i = dc42_write_sector_tags(&profile, b, &block[o]);
+    i = profile.write_sector_tags(&profile, b, &block[o]);
     if (i)
     {
       fprintf(stderr, "\n\nError writing block tags %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
   }
 
-  dc42_close_image(&profile);
+  profile.close_image(&profile);
   puts("                                                               \rDone.");
   close(blu);
   return 0;

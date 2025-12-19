@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Error seeking to sector %d (%ld).\n", i, get_idefile_offset(i) / 532);
 			free(data);
 			free(tags);
-			dc42_close_image(&f_dc42);
+			f_dc42.close_image(&f_dc42);
 			fclose(f_idefile);
 			return 8;
 		}
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Error reading tags for sector %d.\n", i);
 			free(data);
 			free(tags);
-			dc42_close_image(&f_dc42);
+			f_dc42.close_image(&f_dc42);
 			fclose(f_idefile);
 			return 9;
 		}
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Error reading sector %d.\n", i);
 			free(data);
 			free(tags);
-			dc42_close_image(&f_dc42);
+			f_dc42.close_image(&f_dc42);
 			fclose(f_idefile);
 			return 10;
 		}
@@ -223,14 +223,14 @@ int main(int argc, char *argv[])
 #if DEBUG
 		fprintf(stderr, "Writing sector %d.\n", i);
 #endif
-		dc42_errno = dc42_write_sector_data(&f_dc42, i, data);
+		dc42_errno = f_dc42.write_sector_data(&f_dc42, i, data);
 		if (dc42_errno != 0)
 		{
 			fprintf(stderr, "Error writing sector %d.\n", i);
 			fprintf(stderr, "Error %d: %s.\n", f_dc42.retval, f_dc42.errormsg);
 			free(data);
 			free(tags);
-			dc42_close_image(&f_dc42);
+			f_dc42.close_image(&f_dc42);
 			fclose(f_idefile);
 			return 11;
 		}
@@ -238,14 +238,14 @@ int main(int argc, char *argv[])
 #if DEBUG
 		fprintf(stderr, "Writing tags for sector %d.\n", i);
 #endif
-		dc42_errno = dc42_write_sector_tags(&f_dc42, i, tags);
+		dc42_errno = f_dc42.write_sector_tags(&f_dc42, i, tags);
 		if (dc42_errno != 0)
 		{
 			fprintf(stderr, "Error writing tags for sector %d.\n", i);
 			fprintf(stderr, "Error %d: %s.\n", f_dc42.retval, f_dc42.errormsg);
 			free(data);
 			free(tags);
-			dc42_close_image(&f_dc42);
+			f_dc42.close_image(&f_dc42);
 			fclose(f_idefile);
 			return 12;
 		}
@@ -255,6 +255,6 @@ int main(int argc, char *argv[])
 
 	free(data);
 	free(tags);
-	dc42_close_image(&f_dc42);
+	f_dc42.close_image(&f_dc42);
 	fclose(f_idefile);
 }

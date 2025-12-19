@@ -192,23 +192,23 @@ int main(int argc, char *argv[])
       fprintf(stderr, "\n\nWARNING: Error reading block # %d, fread size did not return 1 block, got %d blocks!\n", b, i);
     }
 
-    i = dc42_write_sector_data(&profile, b5, &block[0]);
+    i = profile.write_sector_data(&profile, b5, &block[0]);
     if (i)
     {
       fprintf(stderr, "\n\nError writing block data %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
 
-    i = dc42_write_sector_tags(&profile, b5, &block[512]);
+    i = profile.write_sector_tags(&profile, b5, &block[512]);
     if (i)
     {
       fprintf(stderr, "\n\nError writing block tags %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
   }
-  dc42_close_image(&profile);
+  profile.close_image(&profile);
   puts("                                                               \rDone.");
   fclose(raw);
   return 0;

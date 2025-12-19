@@ -104,36 +104,31 @@ int main(int argc, char *argv[])
       exit(1);
    }
 
-   // uint8 *dc42_read_sector_tags(DC42ImageType *F, uint32 sectornumber);               // read a sector's tag data
-   // uint8 *dc42_read_sector_data(DC42ImageType *F, uint32 sectornumber);               // read a sector's data
-   // int dc42_write_sector_tags(DC42ImageType *F, uint32 sectornumber, uint8 *tagdata); // write tag data to a sector
-   // int dc42_write_sector_data(DC42ImageType *F, uint32 sectornumber, uint8 *data);    // write sector data to a sector
-
    for (int x = 0; x < min(in.numblocks, 800u); x++)
    {
-      data = dc42_read_sector_data(&in, x);
+      data = in.read_sector_data(&in, x);
       if (!data)
       {
          fprintf(stderr, "Could not read data for sector %d from image!\n", x);
-         dc42_close_image(&in);
+         in.close_image(&in);
          exit(2);
       }
-      dc42_write_sector_data(&out, x, data);
+      out.write_sector_data(&out, x, data);
 
       if (in.tagsize)
       {
-         tags = dc42_read_sector_tags(&in, x);
+         tags = in.read_sector_tags(&in, x);
          if (!tags)
          {
             fprintf(stderr, "Could not read tags for sector %d from image!\n", (int)x);
-            dc42_close_image(&in);
+            in.close_image(&in);
             exit(2);
          }
-         dc42_write_sector_tags(&out, x, tags);
+         out.write_sector_tags(&out, x, tags);
       }
    }
 
-   dc42_close_image(&in);
-   dc42_close_image(&out);
+   in.close_image(&in);
+   out.close_image(&out);
    return 0;
 }

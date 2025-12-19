@@ -273,9 +273,12 @@ fi
 if [[ -n "$WHICHLIBDC42" ]]; then
    WHICHLIBDC42="../$WHICHLIBDC42"
 else
-   subbuild src/lib/libdc42      --no-banner             $SIXTYFOURBITS $SARCH
-   WHICHLIBDC42="`ls src/lib/libdc42/lib/libdc42.*.a 2>/dev/null`"
-   if [[ ! -f "$WHICHLIBDC42" ]]; then exit 1; fi
+   subbuild ../lib/libdc42      --no-banner             $SIXTYFOURBITS $SARCH
+   WHICHLIBDC42="`ls ../lib/libdc42/lib/libdc42.*.a 2>/dev/null`"
+   if [[ ! -f "$WHICHLIBDC42" ]]; then
+      echo "Building libdc42 have failed. Exiting."
+      exit 1;
+   fi
    DC42INCLUDE="../../lib/libdc42/include"
    WHICHLIBDC42="../$WHICHLIBDC42"
 fi

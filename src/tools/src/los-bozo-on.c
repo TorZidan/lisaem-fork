@@ -12,8 +12,8 @@
 
 void deserialize(DC42ImageType *F)
 {
-    uint8 *mddftag = dc42_read_sector_tags(F, 28);
-    uint8 *mddfsec = dc42_read_sector_data(F, 28);
+    uint8 *mddftag = F->read_sector_tags(F, 28);
+    uint8 *mddfsec = F->read_sector_data(F, 28);
 
     // Remove Lisa signature on previously used Serialized Master Disks //////////////////////////////////////////////
     if (mddftag[4] == 0 && mddftag[5] == 1 && // MDDF Signature
@@ -38,7 +38,7 @@ void deserialize(DC42ImageType *F)
             uint8 buf[512];
             memcpy(buf, mddfsec, 512);
             buf[0xcc] = buf[0xcd] = buf[0xce] = buf[0xcf] = 0;
-            dc42_write_sector_data(F, 28, buf);
+            F->write_sector_data(F, 28, buf);
             printf("Disk MDDF signed by Lisa SN: %08x (%d) zeroed out.", disk_sn, disk_sn);
         }
     }
@@ -49,11 +49,11 @@ void deserialize(DC42ImageType *F)
     for (int sec = 32; (unsigned)sec < F->numblocks / 3; sec++)
     {
         char name[64];
-        ftag = dc42_read_sector_tags(F, sec);
+        ftag = F->read_sector_tags(F, sec);
 
         if (ftag[4] == 0xff) // tool entry tags have tag 4 as ff
         {
-            fsec = dc42_read_sector_data(F, sec);
+            fsec = F->read_sector_data(F, sec);
             int s = fsec[0]; // size of string (pascal string)
             // possible file name, very likely to be the right size.
             // Look for {T*}obj.  i.e. {T5}obj is LisaList, but could have {T9999}obj but very unlikely
@@ -77,7 +77,7 @@ void deserialize(DC42ImageType *F)
                     memcpy(buf, fsec, 512);
                     buf[0x42] = buf[0x43] = buf[0x44] = buf[0x45] = 0;
                     buf[0x48] = buf[0x49] = 1;
-                    dc42_write_sector_data(F, sec, buf);
+                    F->write_sector_data(F, sec, buf);
                 }
             }
         }
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
             deserialize(&F);
         else
             fprintf(stderr, "Could not open image %s because %s\n", argv[i], F.errormsg);
-        dc42_close_image(&F);
+        F.close_image(&F);
     }
 
     return 0;

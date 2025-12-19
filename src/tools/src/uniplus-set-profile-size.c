@@ -227,22 +227,22 @@ void writepart(DC42ImageType *F, uint8 *fsec)
 
    if (save == 0xfffffffe)
    {
-      int i = dc42_write_sector_data(F, 526, fsec); // write the sector back to the image
+      int i = F->write_sector_data(F, 526, fsec); // write the sector back to the image
       if (i)
       {
          fprintf(stderr, "\n\nError writing block data 526 to dc42 because %s\n", F->errormsg);
-         dc42_close_image(F);
+         F->close_image(F);
          exit(1);
       }
 
       // sunix kernel changes - sec 613, a-start 0x1fc,  sec 620  b-size .. f-size starting at offset 0.
       {
          uint8 *vsec, sec[512];
-         vsec = dc42_read_sector_data(F, 613);
+         vsec = F->read_sector_data(F, 613);
          if (!vsec)
          {
             fprintf(stderr, "\n\nError reading block 613 to dc42 because %s\n", F->errormsg);
-            dc42_close_image(F);
+            F->close_image(F);
             exit(1);
          }
          memcpy(sec, vsec, 512);
@@ -252,19 +252,19 @@ void writepart(DC42ImageType *F, uint8 *fsec)
          sec[0x1fe] = (astart & 0x0000ff00) >> 8;
          sec[0x1ff] = (astart & 0x000000ff);
 
-         i = dc42_write_sector_data(F, 613, fsec);
+         i = F->write_sector_data(F, 613, fsec);
          if (i)
          {
             fprintf(stderr, "\n\nError writing block 613 to dc42 because %s\n", F->errormsg);
-            dc42_close_image(F);
+            F->close_image(F);
             exit(1);
          }
 
-         vsec = dc42_read_sector_data(F, 620);
+         vsec = F->read_sector_data(F, 620);
          if (!vsec)
          {
             fprintf(stderr, "\n\nError reading block 620 to dc42 because %s\n", F->errormsg);
-            dc42_close_image(F);
+            F->close_image(&F);
             exit(1);
          }
          memcpy(sec, vsec, 512);
@@ -337,11 +337,11 @@ void writepart(DC42ImageType *F, uint8 *fsec)
          sec[0x03a] = (h_size & 0x0000ff00) >> 8;
          sec[0x03b] = (h_size & 0x000000ff);
 
-         i = dc42_write_sector_data(F, 620, fsec);
+         i = F->write_sector_data(F, 620, fsec);
          if (i)
          {
             fprintf(stderr, "\n\nError writing block 620 to dc42 because %s\n", F->errormsg);
-            dc42_close_image(F);
+            F->close_image(F);
             exit(1);
          }
       }
@@ -355,82 +355,82 @@ void start(DC42ImageType *F)
    uint8 *fsec;
 
    char *wrong_disk = "Error. This does not appear to be the UniPlus boot disk.\n";
-   ftag = dc42_read_sector_tags(F, 0);
+   ftag = F->read_sector_tags(F, 0);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(10);
    }
-   ftag = dc42_read_sector_tags(F, 1);
+   ftag = F->read_sector_tags(F, 1);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(1);
    }
-   ftag = dc42_read_sector_tags(F, 2);
+   ftag = F->read_sector_tags(F, 2);
    if (ftag[4] != 0xaa && ftag[5] != 0x00)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(2);
    }
-   ftag = dc42_read_sector_tags(F, 3);
+   ftag = F->read_sector_tags(F, 3);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(3);
    }
-   ftag = dc42_read_sector_tags(F, 4);
+   ftag = F->read_sector_tags(F, 4);
    if (ftag[4] != 0xaa && ftag[5] != 0x00)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(4);
    }
-   ftag = dc42_read_sector_tags(F, 5);
+   ftag = F->read_sector_tags(F, 5);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(5);
    }
-   ftag = dc42_read_sector_tags(F, 6);
+   ftag = F->read_sector_tags(F, 6);
    if (ftag[4] != 0xaa && ftag[5] != 0x00)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(6);
    }
-   ftag = dc42_read_sector_tags(F, 7);
+   ftag = F->read_sector_tags(F, 7);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(7);
    }
-   ftag = dc42_read_sector_tags(F, 8);
+   ftag = F->read_sector_tags(F, 8);
    if (ftag[4] != 0xaa && ftag[5] != 0x00)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(8);
    }
-   ftag = dc42_read_sector_tags(F, 9);
+   ftag = F->read_sector_tags(F, 9);
    if (ftag[4] != 0xaa && ftag[5] != 0xaa)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(9);
    }
 
-   fsec = dc42_read_sector_data(F, 526);
+   fsec = F->read_sector_data(F, 526);
    if (fsec[0] != 0x65 || fsec[1] != 0x73)
    {
       fprintf(stderr, wrong_disk);
-      dc42_close_image(F);
+      F->close_image(F);
       exit(11);
    }
 
@@ -674,7 +674,7 @@ int main(int argc, char *argv[])
       writepart(&F, sec);
    }
 
-   dc42_close_image(&F);
+   F.close_image(&F);
 
    return 0;
 }

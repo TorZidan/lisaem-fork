@@ -28,6 +28,14 @@ long interleave5(long sector)
   return offset[sector & 31] + sector - (sector & 31);
 }
 
+// This is another, simplified way to do the interleaving above (currently unused)
+long interleave5_another_way(int sector)
+{
+	int offset_delta[] = {0, 4, 8, 12, 0, 4, 8, -4, 0, 4, -8, -4, 0, -12, -8, -4};
+	return sector + offset_delta[(sector % 16)];
+}
+
+
 long deinterleave5(long sector)
 {
   static const int offset[] = {0, 13, 10, 7, 4, 1, 14, 11, 8, 5, 2, 15, 12, 9, 6, 3, 16, 29, 26, 23, 20, 17, 30, 27, 24, 21, 18, 31, 28, 25, 22, 19};
@@ -185,24 +193,37 @@ int main(int argc, char *argv[])
       fprintf(stderr, "\n\nWARNING: Error reading block # %d, fread size did not return 1 block, got %d blocks!\n", b, i);
     }
 
-    i = dc42_write_sector_tags(&profile, b5, &block[0]);
+    i = profile.write_sector_tags(&profile, b5, &block[0]);
     if (i)
     {
       fprintf(stderr, "\n\nError writing block tags %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
 
-    i = dc42_write_sector_data(&profile, b5, &block[20]);
+    i = profile.write_sector_data(&profile, b5, &block[20]);
     if (i)
     {
       fprintf(stderr, "\n\nError writing block data %d to dc42 ProFile:%s because %s\n", b, dc42filename, profile.errormsg);
-      dc42_close_image(&profile);
+      profile.close_image(&profile);
       exit(1);
     }
   }
-  dc42_close_image(&profile);
+  profile.close_image(&profile);
   puts("                                                               \rDone.");
   fclose(raw);
   return 0;
+}
+
+
+void interleave_deinterleave_test(void)
+{
+  int i;
+  puts("Interleave5 / Deinterleave5 test:");
+  for (i = 0; i < 1000; i++)
+  {
+    long inter = interleave5(i);
+    long deinter = deinterleave5(inter);
+    printf("Sector %3d -> interleave5 -> %3ld -> interleave5-again -> %3ld -> deinterleave5 -> %3ld\n", i, inter, interleave5_another_way(i), deinter);
+  }
 }

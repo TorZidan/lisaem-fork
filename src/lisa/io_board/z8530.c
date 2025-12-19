@@ -257,6 +257,7 @@ extern void set_port_baud_tty(int port, uint32 baud);
 #else
 // temp disable for windows until we flesh these guys out
 char read_serial_port_shell(unsigned int port) { return 0; }
+char read_serial_port_pty(unsigned int port) { return 0; }
 extern char read_serial_port_tty(unsigned int port);
 int poll_telnet_serial_read(int portnum) { return 0; }
 #endif
