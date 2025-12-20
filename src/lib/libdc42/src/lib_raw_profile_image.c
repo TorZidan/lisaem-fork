@@ -61,10 +61,6 @@
 #include <sys/mman.h>
 #include <glob.h>
 #define HAVE_MMAPEDIO
-#else
-#define strncasecmp _strnicmp
-#define strcasecmp _stricmp
-#include <strcasestr.h>
 #endif
 
 #include <errno.h>
