@@ -64,6 +64,12 @@
 
 #ifndef __MSVCRT__
 
+// Claude says O_NDELAY is equivalent to O_NONBLOCK on macOS systems
+// Create a compatibility shim
+#ifndef O_NDELAY
+#define O_NDELAY O_NONBLOCK
+#endif
+
 // Somehow prevents compilation warnings.
 #define _XOPEN_SOURCE 600
 #define __USE_BSD
@@ -138,8 +144,14 @@ void init_pty_serial_port(int port, char *desired_pty_port_symlink_name)
   fcntl(fd[port], F_SETFL, 0);
 
   // Get the pty port name, it is e.g. "/dev/pts/1" 
+  // Fix for macOS
   memset(ptyname, 0, 1023);
-  ptsname_r(fd[port], ptyname, 1023);
+  #ifdef __APPLE__
+    char *pts = ptsname(fd[port]);
+    if (pts) strncpy(ptyname, pts, 1023);
+  #else
+    ptsname_r(fd[port], ptyname, 1023);
+  #endif
 
   // Create a symbolic link to the PTY with the user-provided alias
   if (strlen(desired_pty_port_symlink_name) > 0)
