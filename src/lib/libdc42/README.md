@@ -13,7 +13,7 @@ The library itself is used by LisaEm as well as DiskCopy 4.2 specific tools.
 
 On systems that support memory mapping, it uses the mmap function to load the whole image into RAM and uses the page in/out features of your OS for speed.
 
-Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. The Disk image format is stored in .Image files, but I use .dc42 to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
+Disk Copy 4.2 is an old world, classic MacOS (i.e. System 6-9) 68000 application. I recommend using the .dc42 file extension to make it more clear as to what it is. Such disk images are used for Macintosh floppies, Lisa Floppies, and in some cases even Apple ][ floppies.
 
 LibDC42 has an interface similar to the fopen, fread/frwrite fclose API of libstdc, except that creating a new disk image does not open it. A DC42ImageType structure pointer is passed arround to the functions when various operations are called. The open function can take extra parameters flagging whether to use memory mapping (when available), whether to access an image in Read Only format, and so on. Upon closing the DC42ImageType file, checksums are recalculated and saved. Additionally the errormsg structure member is used to store informational messages when an error occurs and should be used to display error messages to the user as they occur. The retval (return value) member is equivalent to the errno variable, and when set is an indicator that an error has occured and that errormsg should be passed to the user.
 
@@ -152,6 +152,10 @@ int dc42_open_by_handle(DC42ImageType *F, int fd, FILE *fh, long seekstart, char
                                                                                    // i.e. if you use 'w', the fd must have been opened
                                                                                    // in read/write mode, not read only!
 
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options)        // opens a raw profile disk image,
+                                                                                   // like the ones used by popular hardware emulators:
+                                                                                   // IDEFile, ESProfile, Cameo/Aphid and future ones.
+
 
 F: pointer to DC42ImageType - you must allocate this yourself before calling the open function.  You'll need to pass the pointer
                       to this structure to most of these calls.
@@ -283,14 +287,14 @@ typedef struct                          // floppy type
   uint8  ftype;                         // floppy type 0=twig, 1=sony400k, 2=sony800k, 3=freeform, 254/255=disabled
 
 
-  uint32 tagsize;                       // must set to 12 - expect ProFile/Widget to use 24 byte tags
-  uint32 datasize;                      // must set to 512
+  uint32 tagsize;                       // 12 for floppy disk images, 20 for ProFile/Widget hard disk images
+  uint32 datasize;                      // must set to 512. TODO: remove this attribute and use sectorsize instead
 
   uint32 datasizetotal;                 // data size (in bytes of all sectors added together)
   uint32 tagsizetotal;                  // tag size total in bytes
 
   uint32 sectoroffset;                  // how far into the file is the 1st sector
-  uint16 sectorsize;                    // must set to 512  (Twiggies might be 256 bytes/sector, but unknown)
+  uint16 sectorsize;                    // must set to 512
   uint32 tagstart;                      // how far into the file to 1st tag - similar to sectoroffset
 
   uint32 maxtrk, maxsec,maxside, numblocks;  // unused by these routines, but used by the Lisa Emulator
@@ -390,5 +394,8 @@ extern int dc42_extract_macbinii(char *infilename);                             
                                                                                    // NOTE: filename is overwritten with
                                                                                    // extracted file name!  On negative return
                                                                                    // the filename has been altered!
-```
 
+int raw_profile_image_open(DC42ImageType *F, char *filename, char *options);       // opens a raw profile disk image,
+                                                                                   // like the ones used by popular hardware emulators:
+                                                                                   // IDEFile, ESProfile, Cameo/Aphid and future ones.
+```

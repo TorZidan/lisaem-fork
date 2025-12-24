@@ -503,10 +503,6 @@ ACGLOBAL(uint8, highest_bit_val_inv[],
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define MAXIRQQUEUE 64
 
-// *** WARNING Make sure you copy the above to vars.c as
-// it does not include vars.h
-#define PROFILE_IMG_HEADER_SIZE 2048
-
 /* Defines for the Via 6522 code -- MMU needs these to decypher the register accessed. */
 // Expansion Port Slots.  PARPORTVER is the ROM version number.
 #define PARPORTVER   \
