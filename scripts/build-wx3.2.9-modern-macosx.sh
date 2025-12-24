@@ -28,8 +28,6 @@ if [[ ! -d "wxWidgets-${VER}" ]]; then
          wget https://github.com/wxWidgets/wxWidgets/releases/download/v${VER}/wxWidgets-${VER}.tar.bz2 || exit 2 )
    tar xjvf wxWidgets-${VER}.tar.bz2 || exit 3
 
-#   echo "Patching pngpriv.h for latest clang (https://github.com/arcanebyte/lisaem/issues/19)"
-#   patch ./wxWidgets-${VER}/src/png/pngpriv.h ./scripts/pngpriv.h.patch || exit $?
 fi
 
 pushd wxWidgets-${VER}
