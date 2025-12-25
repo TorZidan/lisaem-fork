@@ -56,6 +56,7 @@ The following table outlines successful builds against the respective operating 
 | macOS 14.0 | arm64 | 3.2.4 | Tested - OK |
 | macOS 14.5 | arm64 | 3.2.5 | Tested - OK |
 | macOS 15.1.1 | arm64 | 3.2.6 | Tested - OK |
+| macOS 15.6.1 | arm64 | 3.2.9 | Tested - OK |
 | Windows 10 | x86_64 | N/A | Untested |
 | Ubuntu 22.04 | x86_64 | N/A | Untested |
 
@@ -110,7 +111,7 @@ The scripts directory contains several scripts that you could use to build wxWid
 NOTE: Some of these scripts are referenced in OS-specific installation processes later in this document.
 
 ```
-scripts/build-wx3.2.6-modern-macosx.sh
+scripts/build-wx3.2.9-modern-macosx.sh
 scripts/build-wx3.1.5-cygwin-windows.sh
 scripts/build-wxwidgets-gtk.sh
 ```
@@ -119,7 +120,7 @@ After wxWidgets is installed to `/usr/local/wxsomething`, add `/usr/local/wxsome
 Example:
 
 ```
-$ export PATH=$PATH:/usr/local/wx3.2.6-cocoa-macOS-15.1-x86_64,arm64
+$ export PATH=$PATH:/usr/local/wx3.2.9-cocoa-macOS-15.1-x86_64,arm64
 
 # verify that wxWidgets is available:
 wx-config --list
@@ -137,9 +138,9 @@ Compiling on MacOS X (or macOS) requires upstream wxWidgets (not system provided
 ```
 $ git clone https://github.com/arcanebyte/lisaem
 $ cd lisaem
-$ scripts/build-wx3.2.6-modern-macosx.sh --enable-universal_binary=arm64,x86_64
+$ scripts/build-wx3.2.9-modern-macosx.sh --enable-universal_binary=arm64,x86_64
 
-$ export PATH="/usr/local/wx3.2.6-cocoa-macOS-$(sw_vers -productVersion | cut -d. -f1-2)-x86_64,arm64/bin:$PATH"
+$ export PATH="/usr/local/wx3.2.9-cocoa-macOS-$(sw_vers -productVersion | cut -d. -f1-2)-x86_64,arm64/bin:$PATH"
 $ ./build.sh clean build
 $ sudo ./build.sh install 
 ```
@@ -148,7 +149,7 @@ The `LisaEm.app` application will be installed in the Applications folder.
 
 ### Compiling LisaEm (for all other platforms):
 
-You will need wxWidgets 3.0.4-3.2.5 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
+You will need wxWidgets 3.0.4-3.2.9 installed. Do not use system provided wxWidgets, but rather build your own using the scripts in the scripts directory as mentioned above.
 
 You will want to install/compile wxWidgets **without** the shared library option, except perhaps on GTK systems, but if you do this, it will not be portable except to systems of the same kind and version.
 
