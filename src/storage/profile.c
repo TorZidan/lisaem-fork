@@ -889,7 +889,6 @@ char *profile_state_names[] = {
     /* 12 */ "SEND_STATUS_BYTES_STATE"};
 
 extern void apply_los31_hacks(void);
-extern void apply_mw30_hacks(void);
 
 void ProfileLoop(ProFileType *P, int event)
 {
@@ -988,7 +987,8 @@ void ProfileLoop(ProFileType *P, int event)
             P->last_a_accs = 0;
 
             apply_los31_hacks();
-            apply_mw30_hacks();
+            // We no-longer do MacWorksXL3.0 hacks. See more at https://github.com/arcanebyte/lisaem/issues/40
+            //apply_mw30_hacks_unused(); # This code was in hle.c
 
             DEBUG_LOG(0, "ACK CMD - sending 01 - State transition to State:2");
             return;
