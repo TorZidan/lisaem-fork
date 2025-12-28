@@ -54,6 +54,9 @@ extern t_sr reg68k_sr;
 extern long getsectornum(DC42ImageType *F, uint8 side, uint8 track, uint8 sec);
 extern char *los_error_code(signed long loserror);
 
+extern uint32 total_num_sectors_read; // defined in in floppy.c
+extern uint32 profile_total_num_sectors_read; // defined in in profile.c
+
 #define FLOP_STAT_INVCMD 0x01 // invalid command
 #define FLOP_STAT_INVDRV 0x02 // invalid drive
 #define FLOP_STAT_INVSEC 0x03 // invalid sector
@@ -822,9 +825,9 @@ void romless_proread(void)
   }
   else
   {
-    ALERT_LOG(0, "reading sector.");
-
+    ALERT_LOG(0, "Reading profile sector %d", sectornumber);
     blk = (&P->DC42)->read_sector_data(&P->DC42, sectornumber);
+    profile_total_num_sectors_read++; // Increment these profile read stats
     if (!blk)
     {
       ALERT_LOG(0, "Read sector from blk#%d failed with error:%d %s", sectornumber, P->DC42.retval, P->DC42.errormsg);
@@ -927,7 +930,9 @@ void romless_twgread(void)
   }
   reg68k_regs[8 + 3] = 0x00FCDD81;
 
+  ALERT_LOG(0, "Reading floppy sector %d", sectornumber);
   ptr = F->read_sector_data(F, sectornumber);
+  total_num_sectors_read++; // Increment these floppy read stats
   if (!ptr)
   {
     DEBUG_LOG(0, "Could not read sector #%ld", sectornumber);
