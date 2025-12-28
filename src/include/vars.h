@@ -747,7 +747,7 @@ DECLARE(int, macworks4mb);
 DECLARE(int, consoletermwindow);           // preference: enable TerminalWx window for console terminal (UniPlux, LPW, Xenix, etc.)
 GLOBAL(int, romless, 0);                   // are we romless?
 GLOBAL(int, xenix_patch, 1);               // 2022.03.06 flag to signal Xenix HLE patches
-GLOBAL(int, macworks_hle, 1);              // 2021.04.15 flag to signal MacWorks XL 3.0 has been patched for HLE
+GLOBAL(int, macworks_hle, 1);              // 2025.12.27 this flag is no-longer used. See https://github.com/arcanebyte/lisaem/issues/40
 GLOBAL(int, los31_hle, 1);                 // 2021.04.14 flag to signal LOS 3.1 has been patched for HLE
 GLOBAL(int, monitor_patch, 1);             // 2022.03.06 flag to signal Monitor 12.x has been patched for HLE
 GLOBAL(int, uniplus_hacks, 1);             // 2021.03.05 flag to signal that UniPlus has been patched for profile handshaking

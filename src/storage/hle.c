@@ -315,120 +315,125 @@ void hle_los31_write_00c08d0a(void)
   cpu68k_clocks += (8 + 12 + 4 + 12 + 4 + 20);
 }
 
-void hle_macws_read(uint32 count)
-{
-  ProFileType *P = NULL;
-  int vianum = get_vianum_from_addr(A0);
-  if (vianum > 1 && vianum < 9)
-    P = via[vianum].ProFile;
-  else
-  {
-    ALERT_LOG(0, "Got insane via #%d A0:%08x", vianum, A0);
-    return;
-  }
+// We no-longer do MacWorksXL3.0 hacks. See more at https://github.com/arcanebyte/lisaem/issues/40
+// void hle_macws_read_unused(uint32 count)
+// {
+//   ProFileType *P = NULL;
+//   int vianum = get_vianum_from_addr(A0);
+//   if (vianum > 1 && vianum < 9)
+//     P = via[vianum].ProFile;
+//   else
+//   {
+//     ALERT_LOG(0, "Got insane via #%d A0:%08x", vianum, A0);
+//     return;
+//   }
 
-  int blocknumber = (P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
-  ALERT_LOG(0, "HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d  PC:%08x A0:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, count, PC, A0);
+//   int blocknumber = (P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
+//   ALERT_LOG(0, "HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d  PC:%08x A0:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, count, PC, A0);
 
-  uint8 r = 0;
-  uint32 e = D1;
+//   uint8 r = 0;
+//   uint32 e = D1;
 
-  for (uint32 i = 0; i < count; i++)
-  {
-    r = P->DataBlock[P->indexread++];
-    e ^= r;
-    lisa_wb_ram(A2, r);
-    A2++;
-  }
+//   for (uint32 i = 0; i < count; i++)
+//   {
+//     r = P->DataBlock[P->indexread++];
+//     e ^= r;
+//     lisa_wb_ram(A2, r);
+//     A2++;
+//   }
 
-  D0 = r;
-  D1 = e;
+//   D0 = r;
+//   D1 = e;
 
-  cpu68k_clocks += (count * (8 + 4 + 8 + 10)); // this will be off for the 8x loop.
-  D2 |= 0x0000ffff;                            // after DBRA.W D2 is -1
+//   cpu68k_clocks += (count * (8 + 4 + 8 + 10)); // this will be off for the 8x loop.
+//   D2 |= 0x0000ffff;                            // after DBRA.W D2 is -1
 
-  A0 = fetchlong(A7);
-  A7 += 4;
+//   A0 = fetchlong(A7);
+//   A7 += 4;
 
-  RTS;
+//   RTS;
 
-  ALERT_LOG(0, "Returning HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d pc:%08x A0:%08x D1:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, count,
-            PC, A0, D1);
-}
+//   ALERT_LOG(0, "Returning HLE MWXL30 via:%d cmd:%d block:%d idxread:%d count:%d pc:%08x A0:%08x D1:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, count,
+//             PC, A0, D1);
+// }
 
-void hle_macws_write(void)
-{
-  ProFileType *P = NULL;
-  int vianum = get_vianum_from_addr(A0);
-  if (vianum > 1 && vianum < 9)
-    P = via[vianum].ProFile;
-  else
-  {
-    ALERT_LOG(0, "Got insane via #%d A0:%08x", vianum, A0);
-    return;
-  }
+// We no-longer do MacWorksXL3.0 hacks. See more at https://github.com/arcanebyte/lisaem/issues/40
+// void hle_macws_write_unused(void)
+// {
+//   ProFileType *P = NULL;
+//   int vianum = get_vianum_from_addr(A0);
+//   if (vianum > 1 && vianum < 9)
+//     P = via[vianum].ProFile;
+//   else
+//   {
+//     ALERT_LOG(0, "Got insane via #%d A0:%08x", vianum, A0);
+//     return;
+//   }
 
-  int blocknumber = (P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
-  ALERT_LOG(0, "HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, PC, A0, A2);
+//   int blocknumber = (P->DataBlock[5] << 16) | (P->DataBlock[6] << 8) | (P->DataBlock[7]);
+//   ALERT_LOG(0, "HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, PC, A0, A2);
 
-  for (int i = 0; i <= 128; i++)
-  {
-    P->DataBlock[P->indexwrite++] = fetchbyte(A2);
-    A2++; // MOVE.B     (A0)+,(A2)
-    P->DataBlock[P->indexwrite++] = fetchbyte(A2);
-    A2++; // MOVE.B     (A0)+,(A2)
-    P->DataBlock[P->indexwrite++] = fetchbyte(A2);
-    A2++; // MOVE.B     (A0)+,(A2)
-    P->DataBlock[P->indexwrite++] = fetchbyte(A2);
-    A2++; // MOVE.B     (A0)+,(A2)
-  }
+//   for (int i = 0; i <= 128; i++)
+//   {
+//     P->DataBlock[P->indexwrite++] = fetchbyte(A2);
+//     A2++; // MOVE.B     (A0)+,(A2)
+//     P->DataBlock[P->indexwrite++] = fetchbyte(A2);
+//     A2++; // MOVE.B     (A0)+,(A2)
+//     P->DataBlock[P->indexwrite++] = fetchbyte(A2);
+//     A2++; // MOVE.B     (A0)+,(A2)
+//     P->DataBlock[P->indexwrite++] = fetchbyte(A2);
+//     A2++; // MOVE.B     (A0)+,(A2)
+//   }
 
-  cpu68k_clocks += ((12 + 12 + 4 + 12 + 4 + 12 + 4 + 12 + 10) * 128 + 20);
-  D0 |= 0x0000ffff; // d0.w=-1 after dbra
-  A0 = fetchlong(A7);
-  A7 += 4;
-  RTS;
+//   cpu68k_clocks += ((12 + 12 + 4 + 12 + 4 + 12 + 4 + 12 + 10) * 128 + 20);
+//   D0 |= 0x0000ffff; // d0.w=-1 after dbra
+//   A0 = fetchlong(A7);
+//   A7 += 4;
+//   RTS;
 
-  ALERT_LOG(0, "HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, PC, A0, A2);
-}
+//   ALERT_LOG(0, "HLE LOS31 via:%d cmd:%d block:%d idxread:%d   PC:%08x A0:%08x A2:%08x", vianum, P->DataBlock[4], blocknumber, P->indexread, PC, A0, A2);
+// }
 
-void hle_mw30_intercept(void)
-{
-  if (PC == 0x00163946)
-  {
-    hle_macws_read((D2 + 1) * 8);
-    return;
-  } // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
-  if (PC == 0x00163ade)
-  {
-    hle_macws_write();
-    return;
-  } // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
-  ALERT_LOG(0, "Unhandled MW intercept at %08x", PC);
-}
+// We no-longer do MacWorksXL3.0 hacks. See more at https://github.com/arcanebyte/lisaem/issues/40
+// void hle_mw30_intercept_unused(void)
+// {
+//   if (PC == 0x00163946)
+//   {
+//     hle_macws_read_unused((D2 + 1) * 8);
+//     return;
+//   } // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
+//   if (PC == 0x00163ade)
+//   {
+//     hle_macws_write_unused();
+//     return;
+//   } // same exact code for MW XL 3.0 but A2/A0 swapped and A0 pushed to stack before RTS
+//   ALERT_LOG(0, "Unhandled MW intercept at %08x", PC);
+// }
 
-void apply_mw30_hacks(void)
-{
-  if (!macworks_hle)
-    return;
+// We no-longer do MacWorksXL3.0 hacks. This code was being called from profile.c
+// See more at https://github.com/arcanebyte/lisaem/issues/40
+// void apply_mw30_hacks_unused(void)
+// {
+//   if (!macworks_hle)
+//     return;
 
-  if (check_running_lisa_os() != LISA_MACWORKS_RUNNING || context != 1)
-    return;
+//   if (check_running_lisa_os() != LISA_MACWORKS_RUNNING || context != 1)
+//     return;
 
-  if (lisa_rl_ram(0x00163946) == 0x1010b101 && lisa_rl_ram(0x0016394a) == 0x14c01010)
-  {
-    lisa_ww_ram(0x00163946, 0xf33d);
-    lisa_ww_ram(0x00163ade, 0xf33d);
+//   if (lisa_rl_ram(0x00163946) == 0x1010b101 && lisa_rl_ram(0x0016394a) == 0x14c01010)
+//   {
+//     lisa_ww_ram(0x00163946, 0xf33d);
+//     lisa_ww_ram(0x00163ade, 0xf33d);
 
-    ALERT_LOG(0, "#  # #    #### Patching for MacWorks XL 3.0 ProFile");
-    ALERT_LOG(0, "#  # #    #    Patching for MacWorks XL 3.0 ProFile");
-    ALERT_LOG(0, "#### #    #### Patching for MacWorks XL 3.0 ProFile");
-    ALERT_LOG(0, "#  # #    #    Patching for MacWorks XL 3.0 ProFile");
-    ALERT_LOG(0, "#  # #### #### Patching for MacWorks XL 3.0 ProFile");
-  }
+//     ALERT_LOG(0, "#  # #    #### Patching for MacWorks XL 3.0 ProFile");
+//     ALERT_LOG(0, "#  # #    #    Patching for MacWorks XL 3.0 ProFile");
+//     ALERT_LOG(0, "#### #    #### Patching for MacWorks XL 3.0 ProFile");
+//     ALERT_LOG(0, "#  # #    #    Patching for MacWorks XL 3.0 ProFile");
+//     ALERT_LOG(0, "#  # #### #### Patching for MacWorks XL 3.0 ProFile");
+//   }
 
-  macworks_hle = 0;
-}
+//   macworks_hle = 0;
+// }
 
 void hle_los_intercept(void)
 {
@@ -695,7 +700,7 @@ void hle_intercept(void)
     hle_los_intercept();
     return;
   case LISA_MACWORKS_RUNNING:
-    hle_mw30_intercept();
+    // hle_mw30_intercept_unused();
     return;
   }
 
