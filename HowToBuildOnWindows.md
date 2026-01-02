@@ -65,6 +65,13 @@ cd ~/lisaem
 
 This will compile and generate the LisaEm executable file `bin/lisaem.exe`, along with other tools in the same `bin` subfolder.
 
+If you want to run the produced executable file (above), you will first need to copy the "skins" folder:
+
+```
+cp -r resources/skins/ bin
+bin/lisaem.exe
+```
+
 ## 6. Installing the LisaEm binaries on Windows
 
   ### Option 1: Use the "build install" command:
@@ -91,7 +98,9 @@ This will compile and generate the LisaEm executable file `bin/lisaem.exe`, alon
   ```
 
 ## Running the LisaEm emulator
-You don't need Cygwin in order to run LisaEm. Open Windows File Explorer, navigate to your installation folder (e.g. `C:\Program Files\Sunder.NET\LisaEm`) and double-click on LisaEm.exe to launch it.
+Once you install LisaEm using the steps above, you don't need Cygwin in order to run it.
+Open Windows File Explorer, navigate to your installation folder (e.g. `C:\Program Files\Sunder.NET\LisaEm`) and double-click on LisaEm.exe to launch it.
+Optionally, drag a shortcut to your desktop, to find it easier next time.
 
 At first start, it will create the emulator "preferences" file `C:\Users\<Your Windows User>\AppData\Roaming\lisaem.conf`.
 This way, regardless of how / from where you've started the emulator, it will always find this config file.
