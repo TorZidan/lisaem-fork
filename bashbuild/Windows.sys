@@ -123,7 +123,16 @@ fi
 function windres() {
 
 if [[ -n "$CYGWIN" ]]; then
-    export MINVER="`echo $VERSION| cut -f1 -d'-' | sed 's/\./,/g'`,0"
+    # The MINVER being produced below must contain 4 digits (Major, Minor, Build, Revision), e.g. "1,2,8,0"
+    # This works well only if the VER value is in format "x.x.x".
+    # Determine which variable to use for the version
+    if [[ -z "$VER" || "$VER" == "undefined" ]]; then
+        VERSION_SRC="$RELEASEDATE"
+    else
+        VERSION_SRC="$VER"
+    fi
+    # Cut everything after the first "-" (if any), then, tokenize replace "." with "," , then add ",0" :
+    export MINVER="`echo $VERSION_SRC| cut -f1 -d'-' | sed 's/\./,/g'`,0"
     cat >${XTLD}/resources/windres_private.rc <<END
 #include <windows.h> // include for version info constants
 
@@ -134,7 +143,6 @@ A ICON MOVEABLE PURE LOADONCALL DISCARDABLE "lisaem.ico"
 // THIS WILL MAKE THE PROGRAM USE THE COMMON CONTROLS
 // LIBRARY VERSION 6.0 (IF IT IS AVAILABLE)
 //
-1 24 "lisaem.exe.Manifest"
 
 1 VERSIONINFO
 FILEVERSION ${MINVER}
