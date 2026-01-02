@@ -2210,7 +2210,7 @@ void cli(DC42ImageType *F)
     case QUIT_CMD:
     {
       fprintf(stderr, "Closing Disk Image\n");
-      F->close_image(&F);
+      F->close_image(F);
       fprintf(stderr, "bye.\n");
       exit(0);
     }
