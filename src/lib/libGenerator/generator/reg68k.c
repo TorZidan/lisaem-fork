@@ -2102,7 +2102,8 @@ void a_line(void)
     uint8 size = lisa_ram_safe_getbyte(context, straddr);
     if (size == 0xaf)
       return;
-    fprintf(buglog, "ALINE:%08x:%016llx: A7=%08x\n", alineopcode, (long long)cpu68k_clocks, straddrp);
+    // very noisy, so turning it off:
+    // fprintf(buglog, "ALINE:%08x:%016llx: A7=%08x\n", alineopcode, (long long)cpu68k_clocks, straddrp);
 
     for (int i = 0; i < 32; i += 2)
       if (lisa_ram_safe_getlong(context, straddrp + i) == last_display_str)

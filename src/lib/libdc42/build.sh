@@ -34,8 +34,7 @@ fi
    SOFTWARE="libdc42"                      # name of the software (can contain upper case)
      LCNAME="libdc42"                      # lower case name used for the directory
 DESCRIPTION="libdc42 disk image library"   # description of the package
-        VER="0.9.6"                        # just the version number
-  STABILITY="RELEASE"                      # DEVELOP,ALPHA, BETA, RC1, RC2, RC3... RELEASE
+        VER="0.9.6"                        # the version number
 RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
      AUTHOR="Ray Arachelian"               # name of the author
   AUTHEMAIL="ray@arachelian.com"           # email address for this software
@@ -45,12 +44,10 @@ RELEASEDATE="2019.11.24"                   # release date.  must be YYYY.MM.DD
 
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.

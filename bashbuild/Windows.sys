@@ -320,9 +320,9 @@ function WinNSISPackage() {
      # since makensis is windows, do not put path inside PKGNAME, instead cd into the staged dir
      # and then output the package through the script to some dirs back up.
 
-     PKGNAME="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.exe"
-     NSISSCRIPT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.nsi"
-     NSISOUTPUT="${SOFTWARE}-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.log"
+     PKGNAME="${SOFTWARE}-win-${MACHINE}.exe"
+     NSISSCRIPT="${SOFTWARE}-win-${MACHINE}.nsi"
+     NSISOUTPUT="${SOFTWARE}-win-${MACHINE}.log"
 
      echo "Creating NSIS Windows Package: ${XTLD}/pkg/$PKGNAME" 1>&2
      mkdir -pm755 "${XTLD}/pkg/build/tmp"

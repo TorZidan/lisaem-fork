@@ -52,6 +52,7 @@ function create_packages_for_os() {
          LinuxDebianPackage
          LinuxRPMPackage
          LinuxSnapPackage
+         LinuxAppImage
       fi
 
       [[ -n "$FREEBSD" ]] && FreeBSDPackage
@@ -64,7 +65,7 @@ function create_packages_for_os() {
 
       if  [[ -n "$CYGWIN" ]]; then
           [[ -z "$MACHINE" ]] && export MACHINE="$( uname -m )" 
-          PKGNAME="${XTLD}/pkg/LisaEm-${VER}-${STABILITY}-${RELEASEDATE}-win-${MACHINE}.zip"
+          PKGNAME="${XTLD}/pkg/LisaEm-win-${MACHINE}.zip"
           echo "Creating ZIP and/or NSIS (if available) Windows Package: $PKGNAME" 1>&2
           cd "$PREFIX/../.." || exit 1
           WinZIPPackage "$PKGNAME" "./${COMPANY}/${SOFTWARE}"

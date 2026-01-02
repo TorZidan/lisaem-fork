@@ -122,7 +122,7 @@ function windres() {
 true 
 }
 
-# i.e. macospkg #"net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+# i.e. macospkg #"net.sunder.lisaem" "../../pkg/lisaem-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
 # must call this from the root directory
 function macospkg() {
          REVERSECO="$1"

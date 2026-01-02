@@ -71,6 +71,7 @@ cpu68k/def68k
 cpu68k/gen68k
 include/built_by.h
 obj/get-uintX-types
+scripts/appimagetool
 src/include/machine.h
 src/tools/include/machine.h
 src/lib/libdc42/include/machine.h
