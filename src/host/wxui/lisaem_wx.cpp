@@ -176,6 +176,7 @@
 #include <wx/cmdline.h>
 #include <wx/utils.h>
 #include <wx/dnd.h>
+#include <wx/filename.h>
 #include <terminalwx.h>
 
 // RAW_BITMAP_ACCESS should be used in most cases as it proves much higher performance
@@ -2238,17 +2239,17 @@ LisaWin::LisaWin(wxWindow *parent)
     wxRect geo = display.GetGeometry();
     ALERT_LOG(0, "Got Display Geometry size(%d,%d)", geo.GetWidth(), geo.GetHeight());
     ALERT_LOG(0, "========================================================================");
+
+    const wxRect r = display.GetClientArea();
+    screensizex = r.GetWidth();
+    screensizey = r.GetHeight();
+
     if (screensizex < 0 || screensizex > 8192 || screensizey < 0 || screensizey > 8192)
     {
       ALERT_LOG(0, "Got Garbage screen size: %d,%d", screensizex, screensizey);
       screensizex = 1024;
       screensizey = 768;
     }
-
-    const wxRect r = display.GetClientArea();
-    screensizex = r.GetWidth();
-    screensizey = r.GetHeight();
-
     ALERT_LOG(0, "Primary display: %d,%d", screensizex, screensizey);
     // ALERT_LOG(0,"PPI: %d,%d",p.GetHeight(),p.GetWidth());
 
@@ -3183,7 +3184,7 @@ void LisaEmApp::LisaSkinConfig(void)
     pConfig = new wxFileConfig(_T("LisaEm"),
                                _T("sunder.NET"),
                                (myconfigfile), // local
-                               (myconfigfile), // global
+                               wxEmptyString,  // global
                                wxCONFIG_USE_LOCAL_FILE,
                                wxConvAuto()); // or wxConvUTF8
 }
@@ -3241,7 +3242,7 @@ bool LisaEmApp::OnInit()
     pConfig = new wxFileConfig(_T("LisaEm"),
                                _T("sunder.NET"),
                                (myconfigfile), // local
-                               (myconfigfile), // global
+                               wxEmptyString,  // global
                                wxCONFIG_USE_LOCAL_FILE,
                                wxConvAuto()); // or wxConvUTF8
 
@@ -7381,22 +7382,41 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
     wxAboutDialogInfo info;
     info.SetName(_T("LisaEm"));
 
-#ifdef VERSION
-    info.SetVersion(_T(VERSION));
-#else
-  info.SetVersion(_T("1.x.x Unknown"));
+    // On macOS, the application icon is typically set in the application bundle, and wxAboutBox will automatically use it
+    // On all other platforms, specify it here:
+#ifndef __WXOSX__
+    info.SetIcon(wxICON(lisa2icon));
 #endif
 
-    info.SetDescription(_T("The first fully functional Apple Lisa emulator."));
-    info.SetCopyright(_T("\xa9 2007, 2021 Ray Arachelian"));
-    info.SetWebSite(_T("http://lisaem.sunder.net"));
+#ifdef VERSION
+    info.SetVersion(_T("Version " VERSION));
+#else
+  info.SetVersion(_T(""));
+#endif
 
-    // #ifdef BUILTBY
-    info.AddDeveloper(_T("\n\n" BUILTBY));
-    // #endif
+    wxString description = _T("The first fully functional Apple Lisa emulator.");
+    wxString exePath = wxStandardPaths::Get().GetExecutablePath();
+    wxFileName exeFile(exePath);
+    description << "\n\nThe LisaEm binary is in : " << exeFile.GetFullPath();
+    description << "\n\nThe Skin resource folder is: "<< CSTR(skindir);
+
+#ifdef BUILTBY
+    description << "\n\n" BUILTBY;
+#endif
+
+    // wxString path;
+    // if (wxGetEnv(wxT("PATH"), &path))
+    // {
+    //   description << "\n\nEnv. variable PATH:\n"
+    //               << path;
+    // }
+
+    info.SetDescription(description);
+    info.SetCopyright(_T("\xa9 2026 Friends of Ray Arachelian"));
+    info.SetWebSite(_T("https://lisaem.sunder.net"));
 
     info.AddDeveloper(_T("Ray Arachelian - Emulator"));
-    info.AddDeveloper(_T("James Ponder - 68K core.\n"));
+    info.AddDeveloper(_T("James Ponder - 68K core"));
     info.AddDeveloper(_T("Maxim Stepin, Cameron Zemek, Francois Gannaz - hqx"));
 
 #ifdef LICENSE
@@ -8683,16 +8703,26 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     skindir = resdir + "skins" + osslash + skinname + osslash; // /usr/local/share/LisaEm/skins/default
 
     ALERT_LOG(0, "Skin dir is %s", CSTR(skindir));
+    if (!wxFileName::DirExists(skindir))
+    {
+        wxMessageBox(wxString::Format("Skin directory not found:\n%s\nThis installation of LisaEm is incomplete. Cannot continue."
+          , skindir), _T("Skin Error"), wxICON_ERROR | wxOK);
+    }
 
     myconfig << skindir << skinname << ".conf"; // /usr/local/share/LisaEm/skins/default/default.conf
 
     ALERT_LOG(0, "Using Skin config file::[%s]::", CSTR(myconfig));
+    if (!wxFileName::FileExists(myconfig))
+    {
+        wxMessageBox(wxString::Format("Skin configuration file not found:\n%s\nThis installation of LisaEm is incomplete. Cannot continue."
+          , myconfig), _T("Skin Error"), wxICON_ERROR | wxOK);
+    }
 
     skinconfig = new wxFileConfig(_T("LisaEm"),
                                   _T("sunder.NET"), // company
                                   (myconfig),       // local
-                                  (myconfigfile),   // global
-                                  wxCONFIG_USE_LOCAL_FILE,
+                                  wxEmptyString,    // global
+                                  wxCONFIG_USE_LOCAL_FILE, // Use the "local" skin configuration file defined in "myconfig"
                                   wxConvAuto()); // or wxConvUTF8
     skin.Load(skinconfig);
     ALERT_LOG(0, "Using display size %d,%d", screensizex, screensizey);

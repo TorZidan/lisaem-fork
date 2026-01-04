@@ -27,34 +27,31 @@ else
 fi
 
 ###########################################################################################
-# if you're making your own package using the src.build system, you'll want to set
-# these variables.  These will help populate the appropriate fields in packages.
+# Some of these variables can be overwritten from env variables.
+# Below, VER="${VER:-undefined}" means: use the VER env. variable if it is defined, otherwise use the default value of "undefined" (undefined version).
+# Similarly, the RELEASEDATE env. variavble will be used, or (if not set), it will use "today's date".
 ###########################################################################################
      SOFTWARE="LisaEm"                    # name of the software (can contain upper case)
        LCNAME="lisaem"                    # lower case name used for the directory
   DESCRIPTION="The first fully functional Lisa Emulator™"   # description of the package
-          VER="1.2.8"                     # just the version number
-    STABILITY="RC5"                       # DEVELOP, ALPHA, BETA, RC1, RC2, RC3... 
-                                          # RELEASE/PRODUCTION - PRE-* keep short
+          VER="${VER:-undefined}"         # the version number
                                           # snapcraft limits the length of the version
-  RELEASEDATE="2025.03.15"                # release date.  must be YYYY.MM.DD
+  RELEASEDATE="${RELEASEDATE:-$(date +%Y.%m.%d)}" # release date.  must be YYYY.MM.DD
        AUTHOR="Friends of Ray Arachelian" # name of the author
     AUTHEMAIL="lisaem@arcanebyte.com"     # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
           URL="https://lisaem.sunder.net" # url to website of package
-COPYRIGHTYEAR="2024"
+COPYRIGHTYEAR="2026"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"
 LICENSESHORT="GPL"                        # for use in RPM packages
 # ----------------------------------------------------------------------------------------
 # vars auto built from the above.
-VERSION="${VER}-${STABILITY}_${RELEASEDATE}"
-BUILDDIR="${LCNAME}-${VER}"             # this should match the base directory name
-
+VERSION="${VER}_${RELEASEDATE}"
 # copy the arguements given to us as they'll be used again when we make packages
 BUILDARGS="$0 $@"
-export VER STABILITY RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDDIR BUILDARGS 
+export VER RELEASEDATE AUTHOR SOFTWARE LCNAME DESCRIPTION COMPANY CONAM URL VERSION BUILDARGS 
 
 #------------------------------------------------------------------------------------------#
 # end of standard section for all build scripts.
@@ -743,7 +740,9 @@ export PERCENTJOB=0 NUMJOBSINPHASE=15
 export COMPILECOMMAND="$CC -W $WARNINGS -Wstrict-prototypes -Wno-format -Wno-unused $WITHDEBUG $WITHTRACE $CFLAGS $ARCH $INC -c :INFILE:.c -o :OUTFILE:.o"
 LIST1=$(WAIT="" INEXT=${PHASE1INEXT} OUTEXT=${PHASE1OUTEXT} OBJDIR=${PHASE2OBJDIR} VERB=Compiled COMPILELIST ${PHASE1LIST} )
 
-if [[ $(echo "$PHASE1LIST" | wc -w ) -ne  $(echo "$LIST1" | wc -w )  ]]; then
+EXPECTED_COUNT=$(echo "$PHASE1LIST" | wc -w)
+ACTUAL_COUNT=$(echo "$LIST1" | wc -w)
+if [[ "$EXPECTED_COUNT" -ne "$ACTUAL_COUNT" ]]; then
     echo "Stopping due to failure..." 1>&2
     exit 12
 fi
@@ -931,12 +930,12 @@ if  [[ -f "$LISANAME" ]]; then
            mv ${TOOLLIST} "${TLD}/bin/${MACOSX_MAJOR_VER}/pkg/usr/local/bin/" || exit $?
 
            # create a tools only package
-           macospkg "net.sunder.lisaem" "../../pkg/lisaem-cli-tools-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-cli-tools-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            mkdir -pm755     ./pkg/Applications || exit $?
            mv ../${SOFTWARE}.app ./pkg/Applications || exit $?
 
            # create a LisaEm package
-           macospkg "net.sunder.lisaem" "../../pkg/lisaem-${VER}-${STABILITY}-${RELEASEDATE}-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
+           macospkg "net.sunder.lisaem" "../../pkg/lisaem-macos-${MACOSX_MAJOR_VER}-${MACHINE}.pkg"
            # put things back and clean up
            mv pkg/usr/local/bin/*  "${TLD}/bin/${MACOSX_MAJOR_VER}/"
            mv pkg/Applications/*   "${TLD}/bin"

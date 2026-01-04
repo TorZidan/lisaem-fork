@@ -264,7 +264,7 @@ void writepart(DC42ImageType *F, uint8 *fsec)
          if (!vsec)
          {
             fprintf(stderr, "\n\nError reading block 620 to dc42 because %s\n", F->errormsg);
-            F->close_image(&F);
+            F->close_image(F);
             exit(1);
          }
          memcpy(sec, vsec, 512);
