@@ -17,9 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install libtiff & libtiff-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtiff6 libtiff-dev
+          
       - name: Build wxWidgets
         run: |
-          ./scripts/build-wx3.2.1-gtk.sh --with-libtiff=builtin
+          ./scripts/build-wx3.2.1-gtk.sh
           
       - name: Build LisaEm
         run: |
