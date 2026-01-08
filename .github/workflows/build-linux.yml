@@ -19,7 +19,7 @@ jobs:
 
       - name: Build wxWidgets
         run: |
-          ./scripts/build-wx3.2.1-gtk.sh
+          ./scripts/build-wx3.2.1-gtk.sh --with-libtiff=builtin
           
       - name: Build LisaEm
         run: |
