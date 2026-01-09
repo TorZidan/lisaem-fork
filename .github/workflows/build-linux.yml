@@ -27,9 +27,9 @@ jobs:
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
         run: |
           echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
-          echo "Exported environment variable VER=$VER"
+          echo "Exported environment variable VER=${{ inputs.version_id }}"
           echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
-          echo "Exported environment variable RELEASEDATE=$RELEASEDATE"
+          echo "Exported environment variable RELEASEDATE=${{ inputs.today }}"
         
       - name: Install libraries that are needed to build wxWidgets
         # Note: "libfuse2" below is needed by the appimagetool that packages LisaEm into an .AppImage file
