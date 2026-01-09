@@ -38,7 +38,7 @@ jobs:
         uses: cygwin/cygwin-install-action@master
         with:
           # Provide a space-separated or comma-separated list of packages to install
-          packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make
+          packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make zip
 
       - name: Run a simple echo command in Cygwin to test the installation
         run: echo "Cygwin is installed!"
@@ -62,5 +62,11 @@ jobs:
       - name: Build LisaEm
         run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build package
 
-      - name: List the produced executable lisaem.exe
+      - name: List the generated artifacts
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip"
