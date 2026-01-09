@@ -25,14 +25,25 @@ jobs:
         run: ls -la .
         
       - name: Install libraries that are needed to build wxWidgets
+        # Note: "libfuse2" is needed by the appimagetool that packages LisaEm into an .AppImage file
         run: |
           sudo apt-get update
-          sudo apt-get install -y libtiff6 libtiff-dev build-essential libgtk-3-dev
+          sudo apt-get install -y libtiff6 libtiff-dev build-essential libgtk-3-dev libfuse2
           
-      - name: Build and install wxWidgets
+      - name: Download, build and install wxWidgets
         run: |
           ./scripts/build-wx3.2.1-gtk.sh
-          
+          # Add wxWidgets to PATH
+          echo "/usr/local/wx3.2.1-gtk/bin" >> $GITHUB_PATH
+
+      - name: Download appimagetool
+        run: |
+          cd scripts
+          wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          mv appimagetool-x86_64.AppImage appimagetool
+          chmod +x appimagetool
+          cd ..
+
       - name: Build and package LisaEm
         run: |
           ./build.sh clean build package
