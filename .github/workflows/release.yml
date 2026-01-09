@@ -26,7 +26,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "release" ]]; then
             echo "version_id=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
           else
-            A continuous build. Use the commit id. Example: version_id=continuous-3e51852
+            # A continuous build. Use the commit id. Example: version_id=continuous-3e51852
             echo "version_id=continuous-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           fi
 
