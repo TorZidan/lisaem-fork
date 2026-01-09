@@ -1,0 +1,56 @@
+name: Build and package LisaEm for Linux
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        required: true
+        type: string
+      today:
+        required: true
+        type: string
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    steps:
+      # Avoid \r\n line endings
+      - run: git config --global core.autocrlf input
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List the checked out LisaEm files (the top folder only)
+        run: ls -la .
+        
+      - name: Install libraries that are needed to build wxWidgets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtiff6 libtiff-dev build-essential libgtk-3-dev
+          
+      - name: Build and install wxWidgets
+        run: |
+          ./scripts/build-wx3.2.1-gtk.sh
+          
+      - name: Build and package LisaEm
+        run: |
+          ./build.sh clean build package
+
+      - name: List the generated files
+        run: |
+          ls -l ./bin/lisaem
+          ls -l ./pkg/LisaEm_Linux_x86_64.AppImage
+          
+      - name: Rename AppImage file to include version and date
+        run: |
+          # Use the variables passed from the master to name the file
+          FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Linux_x86_64.AppImage"
+          mv ./pkg/LisaEm_Linux_x86_64.AppImage "$FILENAME"
+          echo "FINAL_NAME=$FILENAME" >> $GITHUB_ENV
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: ${{ env.FINAL_NAME }}
