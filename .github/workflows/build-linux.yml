@@ -23,9 +23,16 @@ jobs:
 
       - name: List the checked out LisaEm files (the top folder only)
         run: ls -la .
+
+      - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
+        run: |
+          echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
+          echo "Exported environment variable VER=$VER"
+          echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
+          echo "Exported environment variable RELEASEDATE=$RELEASEDATE"
         
       - name: Install libraries that are needed to build wxWidgets
-        # Note: "libfuse2" is needed by the appimagetool that packages LisaEm into an .AppImage file
+        # Note: "libfuse2" below is needed by the appimagetool that packages LisaEm into an .AppImage file
         run: |
           sudo apt-get update
           sudo apt-get install -y libtiff6 libtiff-dev build-essential libgtk-3-dev libfuse2
@@ -55,13 +62,22 @@ jobs:
           
       - name: Rename AppImage file to include version and date
         run: |
-          # Use the variables passed from the master to name the file
-          FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Linux_x86_64.AppImage"
-          mv ./pkg/LisaEm_Linux_x86_64.AppImage "$FILENAME"
-          echo "FINAL_NAME=$FILENAME" >> $GITHUB_ENV
+          # Use the variables passed from the master to name the artifact files
+          
+          APPIMAGE_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Linux_x86_64.AppImage"
+          mv ./pkg/LisaEm_Linux_x86_64.AppImage "$APPIMAGE_FILENAME"
+          echo "APPIMAGE_FILENAME=$APPIMAGE_FILENAME" >> $GITHUB_ENV
+
+          # Parse the ubuntu version (e.g. 24.04) into an env var OSREL_VERSION_ID
+          eval $(sed -e 's/^/export OSREL_/g' /etc/os-release )
+          DEBPKG_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-ubuntu-${OSREL_VERSION_ID}-amd64.deb"
+          mv ./pkg/LisaEm-ubuntu-${OSREL_VERSION_ID}-amd64.deb "$DEBPKG_FILENAME"
+          echo "DEBPKG_FILENAME=$DEBPKG_FILENAME" >> $GITHUB_ENV
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
-          path: ${{ env.FINAL_NAME }}
+          path: |
+            ${{ env.APPIMAGE_FILENAME }}
+            ${{ env.DEBPKG_FILENAME }}
