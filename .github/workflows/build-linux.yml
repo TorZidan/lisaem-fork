@@ -71,7 +71,7 @@ jobs:
           # Parse the ubuntu version (e.g. 24.04) into an env var OSREL_VERSION_ID
           eval $(sed -e 's/^/export OSREL_/g' /etc/os-release )
           DEBPKG_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-ubuntu-${OSREL_VERSION_ID}-amd64.deb"
-          mv ./pkg/LisaEm-ubuntu-${OSREL_VERSION_ID}-amd64.deb "$DEBPKG_FILENAME"
+          mv ./pkg/LisaEm_amd64.deb "$DEBPKG_FILENAME"
           echo "DEBPKG_FILENAME=$DEBPKG_FILENAME" >> $GITHUB_ENV
 
       - name: Upload Artifact
