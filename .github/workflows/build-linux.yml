@@ -55,29 +55,35 @@ jobs:
         run: |
           ./build.sh clean build package
 
-      - name: List the generated files
+      - name: List the generated artifacts
         run: |
           ls -l ./bin/lisaem
           ls -l ./pkg/LisaEm_Linux_x86_64.AppImage
+          ls -l ./pkg/LisaEm_amd64.deb
           
-      - name: Rename AppImage file to include version and date
+      - name: Rename artifact files to include version and date
         run: |
           # Use the variables passed from the master to name the artifact files
           
           APPIMAGE_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Linux_x86_64.AppImage"
           mv ./pkg/LisaEm_Linux_x86_64.AppImage "$APPIMAGE_FILENAME"
-          echo "APPIMAGE_FILENAME=$APPIMAGE_FILENAME" >> $GITHUB_ENV
 
           # Parse the ubuntu version (e.g. 24.04) into an env var OSREL_VERSION_ID
           eval $(sed -e 's/^/export OSREL_/g' /etc/os-release )
           DEBPKG_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-ubuntu-${OSREL_VERSION_ID}-amd64.deb"
           mv ./pkg/LisaEm_amd64.deb "$DEBPKG_FILENAME"
-          echo "DEBPKG_FILENAME=$DEBPKG_FILENAME" >> $GITHUB_ENV
+
+          if [[ "${{ inputs.version_id }}" == "continuous-"* ]]; then
+            # Include only the .AppImage package (skipping the .deb package) in continuous builds
+            echo "ARTIFACT_PATHS=$APPIMAGE_FILENAME" >> $GITHUB_ENV
+          else
+            # Include both .AppImage and .deb packages in release builds. The "-*" at the end matches both files
+            echo "ARTIFACT_PATHS=LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-*" >> $GITHUB_ENV
+          fi
+          echo "Will upload the following artifacts: ${{ env.ARTIFACT_PATHS }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
-          path: |
-            ${{ env.APPIMAGE_FILENAME }}
-            ${{ env.DEBPKG_FILENAME }}
+          path: ${{ env.ARTIFACT_PATHS }}
