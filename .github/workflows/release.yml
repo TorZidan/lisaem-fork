@@ -26,7 +26,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "release" ]]; then
             echo "version_id=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
           else
-            echo "version_id=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+            # A continuous build. Use the commit id. Example: version_id=continuous-3e51852
+            echo "version_id=continuous-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           fi
 
   # Call the Child Workflows
