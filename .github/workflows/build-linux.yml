@@ -32,6 +32,9 @@ jobs:
       - name: Build and install wxWidgets
         run: |
           ./scripts/build-wx3.2.1-gtk.sh
+
+      - name: Add wxWidgets to PATH
+        run: echo "/usr/local/wx3.2.1-gtk/bin" >> $GITHUB_PATH
           
       - name: Build and package LisaEm
         run: |
