@@ -65,8 +65,16 @@ jobs:
       - name: List the generated artifacts
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
 
+      - name: Rename artifact file to include version and date
+        run: |
+          # Use the variables passed from the master workflow to rename the artifact file LisaEm-win-x86_64.zip
+          ARTIFACT_FILENAME="pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+          mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
+          echo "ARTIFACT_FILENAME=$ARTIFACT_FILENAME" >> $GITHUB_ENV
+          echo "Will upload the following artifacts: ${{ env.ARTIFACT_FILENAME }}"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: pkg/LisaEm-win-x86_64.zip
+          path: ${{ env.ARTIFACT_FILENAME }}
