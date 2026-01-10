@@ -52,6 +52,7 @@ jobs:
       - name: Download WxWidgets from the web and build it
         run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
 
+      # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
         run: |
           echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
@@ -71,7 +72,8 @@ jobs:
           ARTIFACT_FILENAME="pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
           mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
           echo "ARTIFACT_FILENAME=$ARTIFACT_FILENAME" >> $GITHUB_ENV
-          echo "Will upload the following artifacts: ${{ env.ARTIFACT_FILENAME }}"
+          echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
+          ls -l $ARTIFACT_FILENAME
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
