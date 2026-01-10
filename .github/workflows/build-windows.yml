@@ -73,7 +73,7 @@ jobs:
           mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
           echo "ARTIFACT_FILENAME=$ARTIFACT_FILENAME" >> $GITHUB_ENV
           echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
-          ls -l $ARTIFACT_FILENAME
+          ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
