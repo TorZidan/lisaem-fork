@@ -79,4 +79,4 @@ jobs:
         with:
           name: windows-artifact
           # It's tricky to use the ARTIFACT_FILENAME environment variable here, so we are constructing the path again below
-          path: pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip
+          path: $(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip
