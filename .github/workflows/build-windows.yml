@@ -69,4 +69,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip"
+          path: pkg/LisaEm-win-x86_64.zip
