@@ -54,11 +54,7 @@ jobs:
 
       # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
-        run: |
-          echo "VER=${{ inputs.version_id }}" >> "$(cygpath -u "$GITHUB_ENV")"
-          echo "Exported environment variable VER=${{ inputs.version_id }}"
-          echo "RELEASEDATE=${{ inputs.today }}" >> "$(cygpath -u "$GITHUB_ENV")"
-          echo "Exported environment variable RELEASEDATE=${{ inputs.today }}"
+        run: echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV && echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
 
       - name: Build LisaEm
         run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build package
@@ -67,7 +63,7 @@ jobs:
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
 
       - name: Rename artifact file to include version and date
-        run: cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+        run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
 
       - name: Verify artifact file exists using Windows-native cmd
         run: dir "${{ github.workspace }}"
@@ -77,5 +73,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          # It's tricky to use the ARTIFACT_FILENAME environment variable here, so we are constructing the file name below
-          path: "LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+          path: "pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
