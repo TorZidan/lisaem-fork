@@ -1,4 +1,4 @@
-name: Build and package LisaEm for Linux
+name: Build and package LisaEm for Windows
 
 on:
   workflow_call:
@@ -30,21 +30,18 @@ jobs:
       # Avoid \r\n line endings
       - run: git config --global core.autocrlf input
 
-      # Checks-out my repository under $GITHUB_WORKSPACE, so your job can access it
+      # Check-out the repository into folder ${{ github.workspace }}
       - uses: actions/checkout@v4
 
-      # Installs the latest Cygwin with default packages
+      # Installs the latest Cygwin
       - name: Install Cygwin
         uses: cygwin/cygwin-install-action@master
         with:
-          # Provide a space-separated or comma-separated list of packages to install
+          # Provide a list of Cygwin packages to install
           packages: mingw64-x86_64-gcc-core mingw64-x86_64-gcc-debug-info mingw64-x86_64-gcc-g++ mingw64-x86_64-gcc-objc gcc-core gcc-g++ make zip
 
       - name: Run a simple echo command in Cygwin to test the installation
-        run: echo "Cygwin is installed!"
-
-      - name: Print the installed Cygwin version
-        run: cygcheck -c cygwin
+        run: echo "Cygwin $(cygcheck -c cygwin) is installed!"
 
       - name: List the checked out LisaEm files (the top folder only)
         run: ls -la "$(cygpath '${{ github.workspace }}')"
@@ -52,9 +49,9 @@ jobs:
       - name: Download WxWidgets from the web and build it
         run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
 
-      # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
-        run: echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV && echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
+        # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
+        run: echo "VER=${{ inputs.version_id }}" >> "$(cygpath -u "$GITHUB_ENV")" && echo "RELEASEDATE=${{ inputs.today }}" >> "$(cygpath -u "$GITHUB_ENV")"
 
       - name: Build LisaEm
         run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build package
@@ -65,8 +62,8 @@ jobs:
       - name: Rename artifact file to include version and date
         run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
 
-      - name: Verify artifact file exists using Windows-native cmd
-        run: dir "${{ github.workspace }}"
+      - name: Print artifact file name using Windows-native cmd
+        run: dir "${{ github.workspace }}\pkg"
         shell: cmd
         
       - name: Upload Artifact
