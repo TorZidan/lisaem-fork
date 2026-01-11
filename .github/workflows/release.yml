@@ -40,25 +40,25 @@ jobs:
           fi
 
   # Call the Child Workflows
-  # build-linux:
-  #   needs: setup
-  #   uses: ./.github/workflows/build-linux.yml
-  #   with:
-  #     version_id: ${{ needs.setup.outputs.version_id }}
-  #     today: ${{ needs.setup.outputs.today }}
-  #     version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
-
-  build-windows:
+  build-linux:
     needs: setup
-    uses: ./.github/workflows/build-windows.yml
+    uses: ./.github/workflows/build-linux.yml
     with:
       version_id: ${{ needs.setup.outputs.version_id }}
       today: ${{ needs.setup.outputs.today }}
       version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
+
+  # build-windows:
+  #   needs: setup
+  #   uses: ./.github/workflows/build-windows.yml
+  #   with:
+  #     version_id: ${{ needs.setup.outputs.version_id }}
+  #     today: ${{ needs.setup.outputs.today }}
+  #     version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
       
   # Final job to collect artifacts and post to the release page
   publish:
-    needs: [setup, build-windows]
+    needs: [setup, build-linux]
     runs-on: ubuntu-latest
     if: github.event_name == 'release' || github.event_name == 'push'
     steps:
