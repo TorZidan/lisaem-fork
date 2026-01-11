@@ -32,11 +32,14 @@ jobs:
       - name: Download, build and install wxWidgets
         run: |
           ./scripts/build-wx3.2.9-modern-macosx.sh
-          ls -l /usr/local/wx3.2.9-cocoa-macOS-*
+          ls -l /usr/local/wx3.2.9-cocoa-macOS-15.7-x86_64,arm64/bin
+          echo " testing: $(sw_vers -productVersion | cut -d. -f1-2)"
           # Add wxWidgets to PATH
           echo "/usr/local/wx3.2.9-cocoa-macOS-$(sw_vers -productVersion | cut -d. -f1-2)-x86_64,arm64/bin" >> $GITHUB_PATH
-          # Verify that wxWidgets is available
-          wx-config --list
+          # echo "/usr/local/wx3.2.9-cocoa-macOS-15.7-x86_64,arm64/bin" >> $GITHUB_PATH
+
+      - name: Verify that wxWidgets is available
+        run: wx-config --list
           
       - name: Build and package LisaEm
         run: ./build.sh clean build package
