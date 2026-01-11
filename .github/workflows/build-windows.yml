@@ -75,9 +75,6 @@ jobs:
           echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
           pwd && echo "${{ github.workspace }}" && ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
 
-          # Export to environment variable for the next step
-          # Try later: echo "FINAL_ZIP=$ARTIFACT_FILENAME" >> $GITHUB_ENV
-
       - name: Verify artifact file exists using Windows-native cmd
         run: dir "${{ github.workspace }}"
         shell: cmd
