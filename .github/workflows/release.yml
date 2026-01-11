@@ -13,6 +13,8 @@ jobs:
     outputs:
       version_id: ${{ steps.vars.outputs.version_id }}
       today: ${{ steps.vars.outputs.today }}
+      # The version in the file name will start with today's date for continuous builds, so that they will be ordered nicely chronologically in the release page
+      version_in_file_name: ${{ steps.vars.outputs.version_in_file_name }}
     steps:
       - name: Set Variables
         id: vars
@@ -20,14 +22,19 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           # Get Today's Date
-          echo "today=$(date +'%Y.%m.%d')" >> $GITHUB_OUTPUT
+          TODAY=$(date +'%Y.%m.%d')
+          echo "today=$TODAY" >> $GITHUB_OUTPUT
           
           # Check if this is a release or a push
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "version_id=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            VERSION_ID="${{ github.event.release.tag_name }}"
+            echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "version_in_file_name=$VERSION_ID-$TODAY" >> $GITHUB_OUTPUT
           else
             # A continuous build. Use the commit id. Example: version_id=continuous-3e51852
-            echo "version_id=continuous-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+            VERSION_ID="continuous-${GITHUB_SHA::7}"
+            echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "version_in_file_name=$TODAY-$VERSION_ID" >> $GITHUB_OUTPUT
           fi
 
   # Call the Child Workflows
@@ -44,6 +51,7 @@ jobs:
     with:
       version_id: ${{ needs.setup.outputs.version_id }}
       today: ${{ needs.setup.outputs.today }}
+      version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
       
   # Final job to collect artifacts and post to the release page
   publish:
