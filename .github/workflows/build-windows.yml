@@ -67,13 +67,7 @@ jobs:
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
 
       - name: Rename artifact file to include version and date
-        run: |
-          # Use the variables passed from the master workflow to rename the artifact file LisaEm-win-x86_64.zip
-          # and copy it into folder ${{ github.workspace }} 
-          ARTIFACT_FILENAME=$(echo "LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip" | tr -d '\r')
-          cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
-          echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
-          pwd && echo "${{ github.workspace }}" && ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
+        run: cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
 
       - name: Verify artifact file exists using Windows-native cmd
         run: dir "${{ github.workspace }}"
