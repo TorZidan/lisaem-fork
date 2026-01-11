@@ -55,8 +55,6 @@ jobs:
       # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
         run: |
-          # Tell Cygwin's bash to ignore \r\n in the scriptlet below
-          set -o igncr
           echo "VER=${{ inputs.version_id }}" >> "$(cygpath -u "$GITHUB_ENV")"
           echo "Exported environment variable VER=${{ inputs.version_id }}"
           echo "RELEASEDATE=${{ inputs.today }}" >> "$(cygpath -u "$GITHUB_ENV")"
@@ -70,11 +68,9 @@ jobs:
 
       - name: Rename artifact file to include version and date
         run: |
-          # Tell Cygwin's bash to ignore \r\n in the scriptlet below
-          set -o igncr
           # Use the variables passed from the master workflow to rename the artifact file LisaEm-win-x86_64.zip
           # and copy it into folder ${{ github.workspace }} 
-          ARTIFACT_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+          ARTIFACT_FILENAME=$(echo "LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip" | tr -d '\r')
           cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
           echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
           pwd && echo "${{ github.workspace }}" && ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
