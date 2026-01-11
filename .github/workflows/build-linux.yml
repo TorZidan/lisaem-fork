@@ -45,6 +45,11 @@ jobs:
           ./scripts/build-wx3.2.1-gtk.sh
           # Add wxWidgets to PATH
           echo "/usr/local/wx3.2.1-gtk/bin" >> $GITHUB_PATH
+          
+      - name: Verify that wxWidgets is available
+        run: |
+          which wx-config
+          wx-config --list
 
       - name: Download appimagetool
         run: |
