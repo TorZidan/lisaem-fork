@@ -67,8 +67,8 @@ function create_packages_for_os() {
           [[ -z "$MACHINE" ]] && export MACHINE="$( uname -m )" 
           PKGNAME="${XTLD}/pkg/LisaEm-win-${MACHINE}.zip"
           echo "Creating ZIP and/or NSIS (if available) Windows Package: $PKGNAME" 1>&2
-          cd "$PREFIX/../.." || exit 1
-          WinZIPPackage "$PKGNAME" "./${COMPANY}/${SOFTWARE}"
+          cd "$PREFIX/../../${COMPANY}" || exit 1
+          WinZIPPackage "$PKGNAME" "./${SOFTWARE}"
           WinNSISPackage
       fi
       elapsed=$(get_elapsed_time) && [[ -n "$elapsed" ]] && echo "$elapsed seconds" || echo
