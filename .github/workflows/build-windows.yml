@@ -9,6 +9,9 @@ on:
       today:
         required: true
         type: string
+      version_in_file_name:
+        required: true
+        type: string
 
 defaults:
   run:
@@ -27,13 +30,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Avoid \r\n line endings
-      - run: git config --global core.autocrlf input
+      - name: Avoid \r\n line endings
+        run: git config --global core.autocrlf input
 
-      # Check-out the repository into folder ${{ github.workspace }}
-      - uses: actions/checkout@v4
+      - name: Check-out the repository
+        uses: actions/checkout@v4
 
-      # Installs the latest Cygwin
       - name: Install Cygwin
         uses: cygwin/cygwin-install-action@master
         with:
@@ -60,7 +62,7 @@ jobs:
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
 
       - name: Rename artifact file to include version and date
-        run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+        run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_in_file_name }}-Windows_x86_64.zip"
 
       - name: Print artifact file name using Windows-native cmd
         run: dir "${{ github.workspace }}\pkg"
@@ -70,4 +72,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: "pkg/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
+          path: "pkg/LisaEm-${{ inputs.version_in_file_name }}-Windows_x86_64.zip"
