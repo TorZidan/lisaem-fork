@@ -75,9 +75,16 @@ jobs:
           echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
           pwd && echo "${{ github.workspace }}" && ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
 
+          # Export to environment variable for the next step
+          # Try later: echo "FINAL_ZIP=$ARTIFACT_FILENAME" >> $GITHUB_ENV
+
+      - name: Verify artifact file exists using Windows-native cmd
+        run: dir "${{ github.workspace }}"
+        shell: cmd
+        
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
           # It's tricky to use the ARTIFACT_FILENAME environment variable here, so we are constructing the path again below
-          path: ${{ github.workspace }}\LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip
+          path: "**/*.zip"
