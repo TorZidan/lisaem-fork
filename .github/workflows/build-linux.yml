@@ -9,16 +9,19 @@ on:
       today:
         required: true
         type: string
+      version_in_file_name:
+        required: true
+        type: string
 
 jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     steps:
-      # Avoid \r\n line endings
-      - run: git config --global core.autocrlf input
+      - name: Avoid \r\n line endings
+        run: git config --global core.autocrlf input
       
-      - name: Checkout repository
+      - name: Check-out the repository
         uses: actions/checkout@v4
 
       - name: List the checked out LisaEm files (the top folder only)
@@ -65,12 +68,12 @@ jobs:
         run: |
           # Use the variables passed from the master to name the artifact files
           
-          APPIMAGE_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Linux_x86_64.AppImage"
+          APPIMAGE_FILENAME="LisaEm-${{ inputs.version_in_file_name }}-Linux_x86_64.AppImage"
           mv ./pkg/LisaEm_Linux_x86_64.AppImage "$APPIMAGE_FILENAME"
 
           # Parse the ubuntu version (e.g. 24.04) into an env var OSREL_VERSION_ID
           eval $(sed -e 's/^/export OSREL_/g' /etc/os-release )
-          DEBPKG_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-ubuntu-${OSREL_VERSION_ID}-amd64.deb"
+          DEBPKG_FILENAME="LisaEm-${{ inputs.version_in_file_name }}-ubuntu-${OSREL_VERSION_ID}-amd64.deb"
           mv ./pkg/LisaEm_amd64.deb "$DEBPKG_FILENAME"
 
           if [[ "${{ inputs.version_id }}" == "continuous-"* ]]; then
@@ -78,7 +81,7 @@ jobs:
             echo "ARTIFACT_PATHS=$APPIMAGE_FILENAME" >> $GITHUB_ENV
           else
             # Include both .AppImage and .deb packages in release builds. The "-*" at the end matches both files
-            echo "ARTIFACT_PATHS=LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-*" >> $GITHUB_ENV
+            echo "ARTIFACT_PATHS=LisaEm-${{ inputs.version_in_file_name }}-*" >> $GITHUB_ENV
           fi
           echo "Will upload the following artifacts: ${{ env.ARTIFACT_PATHS }}"
 
