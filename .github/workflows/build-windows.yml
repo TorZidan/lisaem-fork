@@ -71,6 +71,7 @@ jobs:
       - name: Rename artifact file to include version and date
         run: |
           # Tell Cygwin's bash to ignore \r\n in the scriptlet below
+          set -o igncr
           # Use the variables passed from the master workflow to rename the artifact file LisaEm-win-x86_64.zip
           # and copy it into folder ${{ github.workspace }} 
           ARTIFACT_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
