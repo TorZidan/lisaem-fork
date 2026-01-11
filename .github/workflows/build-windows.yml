@@ -71,13 +71,13 @@ jobs:
           # Use the variables passed from the master workflow to rename the artifact file LisaEm-win-x86_64.zip
           # and copy it into the curtrent folder, which is ${{ github.workspace }} 
           ARTIFACT_FILENAME="LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip"
-          cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "./$ARTIFACT_FILENAME"
+          cp "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
           echo "Will upload the following artifacts: $ARTIFACT_FILENAME"
-          pwd && echo "${{ github.workspace }}" && ls -l "./$ARTIFACT_FILENAME"
+          pwd && echo "${{ github.workspace }}" && ls -l "$(cygpath '${{ github.workspace }}')/$ARTIFACT_FILENAME"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
           # It's tricky to use the ARTIFACT_FILENAME environment variable here, so we are constructing the path again below
-          path: ${{ github.workspace }}/LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip
+          path: ${{ github.workspace }}\LisaEm-${{ inputs.version_id }}-${{ inputs.today }}-Windows_x86_64.zip
