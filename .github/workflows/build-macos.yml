@@ -1,0 +1,49 @@
+name: Build and package LisaEm for MacOS
+
+on:
+  workflow_call:
+    inputs:
+      version_id:
+        required: true
+        type: string
+      today:
+        required: true
+        type: string
+      version_in_file_name:
+        required: true
+        type: string
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check-out the repository
+        uses: actions/checkout@v4
+
+      - name: List the checked out LisaEm files (the top folder only)
+        run: ls -la .
+
+      - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
+        run: |
+          echo "VER=${{ inputs.version_id }}" >> $GITHUB_ENV
+          echo "Exported environment variable VER=${{ inputs.version_id }}"
+          echo "RELEASEDATE=${{ inputs.today }}" >> $GITHUB_ENV
+          echo "Exported environment variable RELEASEDATE=${{ inputs.today }}"
+
+      - name: Download, build and install wxWidgets
+        run: |
+          ./scripts/build-wx3.2.9-modern-macosx.sh
+          # Add wxWidgets to PATH
+          # echo "/usr/local/wx3.2.1-gtk/bin" >> $GITHUB_PATH
+          
+      - name: Build and package LisaEm
+        run: ./build.sh clean build package
+
+      - name: List the generated artifacts
+        run: ls -l ./bin/lisaem && ls -l ./pkg
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifact
+          path: LisaEm-macOS_x86_64.dmg
+  
