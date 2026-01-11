@@ -11,6 +11,8 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
+      # The version_id and today will be passed to the LisaEm build script as env variables,
+      # so that they will appear in the LisaEm's Help->About menu.
       version_id: ${{ steps.vars.outputs.version_id }}
       today: ${{ steps.vars.outputs.today }}
       # The version in the file name will start with today's date for continuous builds, so that they will be ordered nicely chronologically in the release page
@@ -34,7 +36,7 @@ jobs:
             # A continuous build. Use the commit id. Example: version_id=continuous-3e51852
             VERSION_ID="continuous-${GITHUB_SHA::7}"
             echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
-            echo "version_in_file_name=$TODAY-$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "version_in_file_name=continuous-$TODAY-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           fi
 
   # Call the Child Workflows
@@ -44,6 +46,7 @@ jobs:
   #   with:
   #     version_id: ${{ needs.setup.outputs.version_id }}
   #     today: ${{ needs.setup.outputs.today }}
+  #     version_in_file_name: ${{ needs.setup.outputs.version_in_file_name }}
 
   build-windows:
     needs: setup
