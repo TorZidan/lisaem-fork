@@ -317,10 +317,11 @@ int o_effective_lisa_vid_size_x = 720;
 void black(void);
 
 // The default configuration object for the application. 
-// On Linux, it is typically stored in file "~/lisaem.conf"
-// On Windows it is in the registry, under HKCU\Software\Vendor\Appname
+// On Linux, it is typically stored in file "~/.lisaem"
+// On Windows it is in the registry, under HKEY_CURRENT_USER\Software\lisaem
 // On MacOS it is ~/Library/Preferences/com.vendor.appname.plist.plist 
-wxConfigBase *myConfig;  // tt is being read at startup this way:  myConfig = wxConfig::Get();
+// It stores, among other things, the LisaEm config filename 
+wxConfigBase *myConfig;  // it is being read at startup this way:  myConfig = wxConfig::Get();
 wxString myconfigfile;   // the LisaEm config filename, e.g. "~/lisaem.conf"
 wxFileStream *pConfigIS; // config file
 
