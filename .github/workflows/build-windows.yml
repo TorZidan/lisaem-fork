@@ -51,24 +51,27 @@ jobs:
       - name: Download WxWidgets from the web and build it
         run: cd "$(cygpath '${{ github.workspace }}')/scripts" && ./build-wx3.2.7-cygwin-windows.sh
 
+      - name: Verify that wxWidgets is available
+        run: which wx-config && wx-config --list
+
       - name: Setup the VER and RELEASEDATE environment variables, to be used by the LisaEm build script
         # The VER and RELEASEDATE environment variables will appear in the Help->About LisaEm menu.
         run: echo "VER=${{ inputs.version_id }}" >> "$(cygpath -u "$GITHUB_ENV")" && echo "RELEASEDATE=${{ inputs.today }}" >> "$(cygpath -u "$GITHUB_ENV")"
 
-      - name: Build LisaEm
+      - name: Build and package LisaEm
         run: cd "$(cygpath '${{ github.workspace }}')" && ./build.sh clean build package
 
       - name: List the generated artifacts
         run: ls -l "$(cygpath '${{ github.workspace }}')/bin/lisaem.exe" && ls -l "$(cygpath '${{ github.workspace }}')/pkg"
 
-      - name: Rename artifact file to include version and date
+      - name: Rename the artifact file to include version and date
         run: mv "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-win-x86_64.zip" "$(cygpath '${{ github.workspace }}')/pkg/LisaEm-${{ inputs.version_in_file_name }}-Windows_x86_64.zip"
 
-      - name: Print artifact file name using Windows-native cmd
+      - name: Print the artifact file name using Windows-native cmd
         run: dir "${{ github.workspace }}\pkg"
         shell: cmd
         
-      - name: Upload Artifact
+      - name: Upload the artifact file
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
