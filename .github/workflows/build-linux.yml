@@ -97,7 +97,6 @@ jobs:
               echo "EOF"
             } >> "$GITHUB_ENV"
           fi
-          echo "Will upload the following artifacts: ${{ env.ARTIFACT_PATHS }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
