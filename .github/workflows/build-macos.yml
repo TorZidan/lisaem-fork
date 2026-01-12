@@ -47,14 +47,14 @@ jobs:
       - name: List the generated artifacts
         run: ls -la ./bin && ls -la ./pkg
 
-      - name: Rename artifact file to include version and date
+      - name: Rename the artifact file to include version and date
         run: |
-          MACOS_VERSION = "$(sw_vers -productVersion | cut -d. -f1-2)"
+          MACOS_VERSION="$(sw_vers -productVersion | cut -d. -f1-2)"
           MACOS_PKG_FILENAME="pkg/LisaEm-${{ inputs.version_in_file_name }}-$MACOS_VERSION-arm64.pkg"
           mv pkg/lisaem-macos-$MACOS_VERSION-arm64.pkg $MACOS_PKG_FILENAME
           echo "ARTIFACT_PATHS=$MACOS_PKG_FILENAME" >> $GITHUB_ENV
           
-      - name: Upload Artifact
+      - name: Upload artifact file
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifact
