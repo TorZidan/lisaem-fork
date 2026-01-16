@@ -64,15 +64,16 @@
 
 #ifndef __MSVCRT__
 
+// Somehow prevents compilation warnings.
+#define _GNU_SOURCE
+#define _XOPEN_SOURCE 600
+#define __USE_BSD
+
 // Claude says O_NDELAY is equivalent to O_NONBLOCK on macOS systems
 // Create a compatibility shim
 #ifndef O_NDELAY
 #define O_NDELAY O_NONBLOCK
 #endif
-
-// Somehow prevents compilation warnings.
-#define _XOPEN_SOURCE 600
-#define __USE_BSD
 
 #include <vars.h>
 #include <z8530_structs.h>

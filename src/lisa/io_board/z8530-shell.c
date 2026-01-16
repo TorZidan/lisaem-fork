@@ -49,6 +49,11 @@
 
 #ifndef __MSVCRT__
 
+// Somehow prevents compilation warnings.
+#define _GNU_SOURCE
+#define _XOPEN_SOURCE 600
+#define __USE_BSD
+
 #include <vars.h>
 #include <z8530_structs.h>
 #include <stdlib.h>
@@ -65,9 +70,6 @@
 #ifndef sun
 #include <err.h>
 #endif
-
-#define _XOPEN_SOURCE 600
-#define __USE_BSD
 
 #include <fcntl.h>
 #include <errno.h>
