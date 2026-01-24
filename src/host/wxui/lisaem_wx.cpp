@@ -316,8 +316,13 @@ int o_effective_lisa_vid_size_x = 720;
 
 void black(void);
 
-wxConfigBase *myConfig;  // default configuration (just a pointer to the active config)
-wxString myconfigfile;   // config filename
+// The default configuration object for the application. 
+// On Linux, it is typically stored in file "~/.lisaem"
+// On Windows it is in the registry, under HKEY_CURRENT_USER\Software\lisaem
+// On MacOS it is ~/Library/Preferences/com.vendor.appname.plist.plist 
+// It stores, among other things, the LisaEm config filename 
+wxConfigBase *myConfig;  // it is being read at startup this way:  myConfig = wxConfig::Get();
+wxString myconfigfile;   // the LisaEm config filename, e.g. "~/lisaem.conf"
 wxFileStream *pConfigIS; // config file
 
 LisaConfigFrame *my_LisaConfigFrame = NULL;
@@ -3229,6 +3234,7 @@ bool LisaEmApp::OnInit()
 
     myConfig = wxConfig::Get(); // this one is the global configuration for the app.
                                 // get the path to the last opened Lisaconfig and load that.
+    // Read the LisaEm preferences file name from myConfig. If no such entry, then use the preference file name in defaultconfig.
     myconfigfile = myConfig->Read(_T("/lisaconfigfile"), defaultconfig);
 
     if (on_start_lisaconfig != "")
@@ -7397,8 +7403,12 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
     wxString description = _T("The first fully functional Apple Lisa emulator.");
     wxString exePath = wxStandardPaths::Get().GetExecutablePath();
     wxFileName exeFile(exePath);
-    description << "\n\nThe LisaEm binary is in : " << exeFile.GetFullPath();
-    description << "\n\nThe Skin resource folder is: "<< CSTR(skindir);
+    description << "\n\nThe LisaEm preferences file is: "<< myconfigfile;
+    description << "\n\nThe LisaEm binary is: " << exeFile.GetFullPath();
+    description << "\n\nThe Skin resource folder is: "<< skindir;
+
+
+    
 
 #ifdef BUILTBY
     description << "\n\n" BUILTBY;
@@ -7546,7 +7556,7 @@ void LisaEmFrame::OnOpen(wxCommandEvent& WXUNUSED(event))
     wxFileDialog open(this, wxT("Open LisaEm Preferences:"),
                       wxEmptyString,
                       wxEmptyString,
-                      wxT("LisaEm Preferences (*.lisaem)|*.lisaem|All (*.*)|*.*"),
+                      wxT("LisaEm Preferences (*.conf)|*.conf|All (*.*)|*.*"),
                       (long int)wxFD_OPEN, wxDefaultPosition);
 
     if (open.ShowModal() == wxID_OK)
@@ -7592,7 +7602,7 @@ void LisaEmFrame::OnSaveAs(wxCommandEvent& WXUNUSED(event))
     wxFileDialog open(this, wxT("Save LisaEm Preferences As:"),
                       justTheDir,      // path
                       justTheFilename, // prefs file name
-                      wxT("LisaEm Preferences (*.lisaem)|*.lisaem|All (*.*)|*.*"),
+                      wxT("LisaEm Preferences (*.conf)|*.conf|All (*.*)|*.*"),
                       (long int)wxFD_SAVE, wxDefaultPosition);
 
     if (open.ShowModal() == wxID_OK)

@@ -49,6 +49,15 @@
 
 #ifndef __MSVCRT__
 
+// Somehow prevents compilation warnings.
+#define _GNU_SOURCE
+#define _XOPEN_SOURCE 600
+#define __USE_BSD
+
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
+
 #include <vars.h>
 #include <z8530_structs.h>
 #include <stdlib.h>
@@ -66,9 +75,6 @@
 #include <err.h>
 #endif
 
-#define _XOPEN_SOURCE 600
-#define __USE_BSD
-
 #include <fcntl.h>
 #include <errno.h>
 
@@ -78,6 +84,12 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <unistd.h>
+
+// Claude says O_NDELAY is equivalent to O_NONBLOCK on macOS systems
+// Create a compatibility shim
+#ifndef O_NDELAY
+#define O_NDELAY O_NONBLOCK
+#endif
 
 // two internal serial ports, 4 port serial card * 3 slots = 14 future if Uni+/Xenix
 // and Quad Port Cards are implemented, for now leave it at 2.
