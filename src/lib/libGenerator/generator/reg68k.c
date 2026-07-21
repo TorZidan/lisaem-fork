@@ -1614,25 +1614,25 @@ void reg68k_ext_exec_various_dbug(void)
   case 0x00fe1d3e:
   {
     ALERT_LOG(0, "Return to ROM - Error 75");
-    debug_off();
+    // debug_off(); // intentionally left off: keep the DEBUG-build trace running past return-to-ROM
     return;
   }
   case 0x00fe0084:
   {
     ALERT_LOG(0, "Return to ROM");
-    debug_off();
+    // debug_off(); // intentionally left off: keep the DEBUG-build trace running past return-to-ROM
     return;
   }
   case 0x00fe1fde:
   {
     ALERT_LOG(0, "Return to ROM - PROERR");
-    debug_off();
+    // debug_off(); // intentionally left off: keep the DEBUG-build trace running past return-to-ROM
     return;
   }
   case 0x00fe1f3a:
   {
     ALERT_LOG(0, "Return to ROM - BOOTERR");
-    debug_off();
+    // debug_off(); // intentionally left off: keep the DEBUG-build trace running past return-to-ROM
     return;
   }
   case 0x00020000:
@@ -3197,7 +3197,14 @@ void reg68k_internal_vector(int vno, uint32 oldpc, uint32 addr_error)
   }
   if (reg68k_pc & 1)
   {
-    EXIT(58, 0, "Doh odd PC value (%08x) on vector (%d) fetch in %s - BYE BYE\n", reg68k_pc, vno, __FUNCTION__);
+    // An odd vector address is the Lisa OS software-reboot signal (Workshop Quit->reboot,
+    // boot-to-a-new-OS after an install, etc.): the OS deliberately faults into a torn-down
+    // vector. Propagate the odd PC so the main loop's reboot detector re-inits the machine like
+    // a cold boot, instead of aborting. (This EXIT(58) formerly shadowed the LISA_REBOOTED()
+    // handler a few lines below, so a legitimate OS reboot crashed the emulator.)
+    ALERT_LOG(0, "odd vector (%d) fetch = %08x - treating as Lisa OS reboot", vno, reg68k_pc);
+    regs.pc = pc24 = reg68k_pc;
+    LISA_REBOOTED();
   }
 
   abort_opcode = 0;
