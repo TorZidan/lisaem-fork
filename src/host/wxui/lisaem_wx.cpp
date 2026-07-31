@@ -626,7 +626,7 @@ enum
   ID_THROTTLE100,
   ID_THROTTLE128,
   ID_THROTTLE256,
-  ID_THROTTLEX,
+  ID_THROTTLE512,
 
   ID_ET100_75,
   ID_ET50_30,
@@ -803,10 +803,9 @@ public:
   void OnThrottle100(wxCommandEvent &event);
   void OnThrottle128(wxCommandEvent &event);
   void OnThrottle256(wxCommandEvent &event);
-
+  void OnThrottle512(wxCommandEvent &event);
 #ifdef DEBUG
   void OnThrottle1(wxCommandEvent &event);
-  void OnThrottle512(wxCommandEvent &event);
 #endif
 
   void OnET100_75(wxCommandEvent &event);
@@ -995,7 +994,6 @@ EVT_MENU(ID_RAWKBBUF, LisaEmFrame::OnRAWKBBUF)
 
 #ifdef DEBUG
 EVT_MENU(ID_THROTTLE1, LisaEmFrame::OnThrottle1)
-EVT_MENU(ID_THROTTLEX, LisaEmFrame::OnThrottle512)
 #endif
 EVT_MENU(ID_THROTTLE5, LisaEmFrame::OnThrottle5)
 EVT_MENU(ID_THROTTLE8, LisaEmFrame::OnThrottle8)
@@ -1008,6 +1006,7 @@ EVT_MENU(ID_THROTTLE64, LisaEmFrame::OnThrottle64)
 EVT_MENU(ID_THROTTLE100, LisaEmFrame::OnThrottle100)
 EVT_MENU(ID_THROTTLE128, LisaEmFrame::OnThrottle128)
 EVT_MENU(ID_THROTTLE256, LisaEmFrame::OnThrottle256)
+EVT_MENU(ID_THROTTLE512, LisaEmFrame::OnThrottle512)
 
 EVT_MENU(ID_ET100_75, LisaEmFrame::OnET100_75)
 EVT_MENU(ID_ET50_30, LisaEmFrame::OnET50_30)
@@ -7798,9 +7797,9 @@ Throttle_MENU(64);
 Throttle_MENU(100);
 Throttle_MENU(128);
 Throttle_MENU(256);
+Throttle_MENU(512);
 #ifdef DEBUG
 Throttle_MENU(1);
-Throttle_MENU(512);
 #endif
 
 extern "C" void messagebox(char *s, char *t)  // messagebox string of text, title
@@ -7956,11 +7955,10 @@ void update_menu_checkmarks(void)
       }
 
 #ifdef DEBUG
-      throttleMenu->Check(ID_THROTTLEX, my_lisaframe->throttle == 512);
       throttleMenu->Check(ID_THROTTLE1, my_lisaframe->throttle == 1.0);
 #else
-    if (my_lisaframe->throttle > 256.0)
-      my_lisaframe->throttle = 256.0;
+    if (my_lisaframe->throttle > 512.0)
+      my_lisaframe->throttle = 512.0;
 #endif
 
       throttleMenu->Check(ID_THROTTLE5, my_lisaframe->throttle == 5.0);
@@ -7974,6 +7972,7 @@ void update_menu_checkmarks(void)
       throttleMenu->Check(ID_THROTTLE100, my_lisaframe->throttle == 100.0);
       throttleMenu->Check(ID_THROTTLE128, my_lisaframe->throttle == 128.0);
       throttleMenu->Check(ID_THROTTLE256, my_lisaframe->throttle == 256.0);
+      throttleMenu->Check(ID_THROTTLE512, my_lisaframe->throttle == 512.0);
 
       throttleMenu->Check(ID_ET100_75, emulation_time == 100 && emulation_tick == 75);
       throttleMenu->Check(ID_ET50_30, emulation_time == 50 && emulation_tick == 30);
@@ -8895,9 +8894,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     throttleMenu->AppendRadioItem(ID_THROTTLE100, wxT("100 MHz"), wxT("100Mhz - For modern machines"));
     throttleMenu->AppendRadioItem(ID_THROTTLE128, wxT("128 MHz"), wxT("128Mhz - For modern machines"));
     throttleMenu->AppendRadioItem(ID_THROTTLE256, wxT("256 MHz"), wxT("256MHz - For modern machines"));
-#ifdef DEBUG
-    throttleMenu->AppendRadioItem(ID_THROTTLEX, wxT("512 Mhz"), wxT("Ludicrous Speed!"));
-#endif
+    throttleMenu->AppendRadioItem(ID_THROTTLE512, wxT("512 Mhz"), wxT("Ludicrous Speed!"));
 
     throttleMenu->AppendSeparator();
     throttleMenu->AppendRadioItem(ID_ET100_75, wxT("Higher 68000 Performance"), wxT("Normal 100/75ms duty timer - faster emulated CPU, less smooth animations"));
