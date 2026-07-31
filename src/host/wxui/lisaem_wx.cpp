@@ -2042,6 +2042,11 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
     }
     barrier = 1;
 
+    // Process any pending UI events.
+    // This ensures menus, dialogs and other UI interactions remain responsive
+    // even when the lisaem process is running at high CPU load.
+    wxTheApp->Yield(false);
+
     onidle_calls++;
 
     if (on_start_poweron && onidle_calls > 5)
