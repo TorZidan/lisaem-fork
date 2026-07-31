@@ -659,6 +659,7 @@ enum
 
   ID_HIDE_HOST_MOUSE,
   ID_USE_MOUSE_SCALE,
+  ID_DISABLE_SCREEN_DIMMING,
 
   ID_VID_SKINS,
   ID_VID_SKINLESSCENTER,
@@ -869,6 +870,7 @@ public:
   void OnFlushPrint(wxCommandEvent &event);
   void OnHideHostMouse(wxCommandEvent &event);
   void OnUseMouseScale(wxCommandEvent &event);
+  void OnDisableScreenDimming(wxCommandEvent &event);
 
   void OnFullScreen(wxCommandEvent &event);
 
@@ -1059,6 +1061,7 @@ EVT_MENU(ID_FORCE_REFRESH, LisaEmFrame::OnForceRefresh)
 
 EVT_MENU(ID_HIDE_HOST_MOUSE, LisaEmFrame::OnHideHostMouse)
 EVT_MENU(ID_USE_MOUSE_SCALE, LisaEmFrame::OnUseMouseScale)
+EVT_MENU(ID_DISABLE_SCREEN_DIMMING, LisaEmFrame::OnDisableScreenDimming)
 
 EVT_MENU(ID_PAUSE, LisaEmFrame::OnPause)
 
@@ -2889,6 +2892,13 @@ void LisaEmFrame::OnUseMouseScale(wxCommandEvent& WXUNUSED(event))
     update_menu_checkmarks();
     ALERT_LOG(0, "use_mouse_scale:%d", use_mouse_scale);}
 
+void LisaEmFrame::OnDisableScreenDimming(wxCommandEvent &WXUNUSED(event))
+{
+    ::disable_screen_dimming = !::disable_screen_dimming;
+    save_global_prefs();
+    update_menu_checkmarks();
+    ALERT_LOG(0, "disable_screen_dimming:%d", ::disable_screen_dimming);}
+
 extern "C" long get_wx_millis(void) {
     return my_lisaframe->runtime.Time();}
 
@@ -3152,6 +3162,7 @@ void save_global_prefs(void)
     myConfig->Write(_T("/hostrefreshrate"), (long)my_lisaframe->hostrefresh);
     myConfig->Write(_T("/forcerefresh"), (long)my_lisaframe->force_display_refresh);
     myConfig->Write(_T("/use_mouse_scale"), (long)my_lisaframe->use_mouse_scale);
+    myConfig->Write(_T("/disable_screen_dimming"), (long)::disable_screen_dimming);
     myConfig->Write(_T("/hidehostmouse"), (long)hide_host_mouse);
 
     my_lisawin->GetClientSize(&x, &y);
@@ -3406,6 +3417,7 @@ bool LisaEmApp::OnInit()
 #else
   my_lisaframe->use_mouse_scale = (int)myConfig->Read(_T("/use_mouse_scale"), (int)1);
 #endif
+    ::disable_screen_dimming = (uint8)myConfig->Read(_T("/disable_screen_dimming"), (long)(0));
 
     my_lisawin->repaintall = REPAINT_INVALID_WINDOW;
     my_lisaframe->Show(true); // Light it up
@@ -7863,6 +7875,7 @@ void update_menu_checkmarks(void)
         fileMenu->Check(ID_PAUSE, (my_lisaframe->running == emulation_paused));
         DisplayMenu->Check(ID_HIDE_HOST_MOUSE, !!hide_host_mouse);
         DisplayMenu->Check(ID_USE_MOUSE_SCALE, my_lisaframe->use_mouse_scale);
+        DisplayMenu->Check(ID_DISABLE_SCREEN_DIMMING, ::disable_screen_dimming);
 
 #ifndef __WXOSX__
         DisplayMenu->Check(ID_VID_FULLSCREEN, (my_lisaframe->IsFullScreen()));
@@ -8879,6 +8892,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
 
     DisplayMenu->AppendCheckItem(ID_HIDE_HOST_MOUSE, wxT("Hide Host Mouse Pointer"), wxT("Hides the host mouse pointer - may cause lag"));
     DisplayMenu->AppendCheckItem(ID_USE_MOUSE_SCALE, wxT("Use Mouse Scaling"), wxT("Enab;e/Disable this if mouse tracking doesn't work"));
+    DisplayMenu->AppendCheckItem(ID_DISABLE_SCREEN_DIMMING, wxT("Disable Screen Dimming"), wxT("Prevent the screen from dimming, as the LOS auto dimming is annoying at high emulation speeds"));
 
 #ifndef __WXOSX__
     DisplayMenu->AppendSeparator();

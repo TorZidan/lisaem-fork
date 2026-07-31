@@ -1129,8 +1129,19 @@ GLOBAL(int, e_dirty_x_max, 0);
 GLOBAL(int, e_dirty_y_min, 500);
 GLOBAL(int, e_dirty_y_max, 0);
 
-GLOBAL(uint8, contrast, 0xff); // 0xff=black 0x80=visible 0x00=all white
-GLOBAL(uint8, volume, 4);      // 0x0e is the mask for this.
+// Some Lisa software (e.g. LOS) can control the screen contrast. 
+// This is the current contrast that the Lisa software has set.
+// It is being set in via6522.c, and is being used in lisaem_wx.cpp to set the contrast of the wxWidgets canvas.
+ // 0xff=black 0x80=visible 0x00=all-white
+GLOBAL(uint8, contrast, 0xff);             
+
+// Corresponds to the the "Display -> Disable Screen Dimming" menu option.
+// LOS and Workshop dims the screen contrast after a period of inactivity, 
+// which is annoying at high emulator throttle speeds, as it happens almost instantly once the user stops typing or moving the mouse.
+// We can disable this behavior by setting this menu option, which sets this variable to 1.  The default is 0, which allows screen dimming.
+// A global variable, so that it will be accessible in via6522.c where it is used.
+GLOBAL(uint8, disable_screen_dimming, 0);
+GLOBAL(uint8, volume, 4);                   // 0x0e is the mask for this.
 GLOBAL(long, *dtc_rom_fseeks, NULL);
 GLOBAL(FILE, *rom_source_file, NULL);
 
