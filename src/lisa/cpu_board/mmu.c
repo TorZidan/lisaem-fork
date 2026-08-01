@@ -303,7 +303,12 @@ void init_start_mode_segment(long i)
             DEBUG_LOG(10, "*** mmu_t[0][%d].wfn!=wfn invalid/changed, good to reset it\n", i);
     }
 #endif
-
+    // Free the old IPCT before setting it to NULL, to avoid orphaning it (a memory leak fix).
+    // If an IPCT was allocated for this page, return it to the free list instead of abandoning it.
+    if (mmu_trans_all[0][i].table != NULL)
+    {
+        free_ipct(mmu_trans_all[0][i].table);
+    }
     mmu_trans_all[0][i].address = adr;
     mmu_trans_all[0][i].readfn = rfn;
     mmu_trans_all[0][i].writefn = wfn;
