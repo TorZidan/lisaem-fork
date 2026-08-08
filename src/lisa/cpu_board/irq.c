@@ -1030,11 +1030,14 @@ void check_current_timer_irq(void)
         // take care of some other housekeeping too
         if (floppy_ram[0])
             floppy_go6504();
-        if (scc_running > 2)
-            scc_control_loop();
+
+        // Removed, as it does nothing useful:
+        // if (scc_running > 2)
+        //     scc_control_loop();
         seek_mouse_event();
-        if (scc_running)
-            scc_control_loop();
+        // Removed, as it does nothing useful:
+        // if (scc_running)
+        //     scc_control_loop();
 
         next_expired_timer = 0;
         get_next_timer_event();

@@ -33,7 +33,7 @@
  *
  * Only async serial is used, most things are virtualized and won't necessarily behave
  * as a real serial port.  Sync-serial, SDLC options, ESCC support, not enabled.
- * CRC function is for future use by SDLC, etc.
+ * 
  *--------------------------------------------------------------------------------------
  * NOTES:
  *
@@ -43,10 +43,27 @@
  * RR8=receive buffer, RR0,1,10,15=status, 12,13=baud rate generator
  * RR3 is always 0 in CHB/port=0, so only valid in channel A/port=1
  *
- *
+ * The simplified "receive" flow is:
+ * Byte arrives -> it gets added to the "receive" FIFO queue 
+ * -> scc_r[port].s.rr0.r.rx_char_available (aka RCA RR0 bit 0) bit gets set and /INT is asserted 
+ * -> 68000 takes interrupt, reads vector to identify source 
+ * -> Lisa reads the byte from RR8 (this removes it from the queue)
+ * -> we clear bit scc_r[port].s.rr0.r.rx_char_available (aka RCA RR0 bit 0) 
+ *    to indicate to the Lisa that there are no more bytes to consume at this point
+ * -> Lisa issues Reset Highest IUS to re-arm the interrupt chain 
+ * -> Ready for the next byte. 
+ * 
+ * So we offer to the Lisa 1 byte per IRQ, 
+ * by clearing (setting to 0) scc_r[0].s.rr0.r.rx_char_available, once Lisa reads the byte from RR8.
+ * A more sophisticated implementation would allow multiple bytes to be queued 
+ * and read by the Lisa in one interrupt.
+ * 
+ * The SCC registers can be accessed in two ways. Example:
+ * - scc_r[1].s.rr3.r.ch_a_rx_irq_pending can be used to manipulate just bit ch_a_rx_irq_pending (the 6th bit)
+ * - scc_r[1].r[3] can be used to read/write the entire register.
+ * This makes the code completely unreadable.
  *-------------------------------------------------------------------------------------*/
 
-#define LISAEMSCCZ8530 1
 #include <vars.h>
 #include <z8530_structs.h>
 
@@ -70,7 +87,13 @@ sccfunc_t scc_fn[2];
 static int scc_fifos_allocated = 0;
 
 uint8 scc_bits_per_char_mask[2];
-FLIFLO_QUEUE_t SCC_READ[16], SCC_WRITE[16]; // if changing this also change the extern in z8530-terminal.cpp!
+
+// FIFO queues for reading and writing data from/to the serial ports.
+FLIFLO_QUEUE_t SCC_READ[2], SCC_WRITE[2]; // if changing this also change the extern in z8530-terminal.cpp!
+
+// The SCC registers for reading and writing data from/to the serial ports.
+scc_r_t scc_r[2]; // 0 is port B, 1 is port A
+scc_w_t scc_w[2]; // 0 is port B, 1 is port A
 
 int xoffflag[2];
 
@@ -79,20 +102,19 @@ int scc_interrupts_enabled = 0;
 int irq_on_next_rx_char[2];
 
 #define IMSK (reg68k_sr.sr_struct.i0 | (reg68k_sr.sr_struct.i1 << 1) | (reg68k_sr.sr_struct.i2 << 2))
-static int sentbytes[2];
-static XTIMER sentbytes_start[2];
 
-// Defines for the above -- hmmm, not really using these...
+// We throttle receiving data on port B (port 0) in attempt to work around a forever bug in the SCC code,
+// where the Lisa software (e.g. a Terminal app) often hangs when receiving a large amount of data from the host.
+// The throttling has two steps for each byte received on port B:
+// 1) we wait for the Lisa to "consume" each received byte on port B, and
+// 2) once the Lisa has consumed a byte, we also wait SCC_MIN_CYCLES_BETWEEN_READS number of clocks before reading the next byte from the sender.
+// Note: We don't throttle receiving data on port A (port 1).
+static uint8 waiting_for_lisa_to_read_port_b = 0;        // Set to 1 when we have received a byte on port B and are waiting for the Lisa to read it. Cleared when the Lisa reads the byte.
+static XTIMER port_b_last_lisa_read_clock_timestamp = 0; // The cpu68k_clocks at the time when Lisa consumed a byte.
+// Longer delays improve the reliability of receiving data, but make the transfer slower.  500000 seems to be a good compromise.
+#define SCC_MIN_CYCLES_BETWEEN_READS 500000
 
-#define CH_B_XMIT_BUFF_EMPTY 0
-#define CH_B_EXT_STAT_CHANGE 1
-#define CH_B_RECEIVE_CHAR_AVAILABLE 2
-#define CH_B_SPECIAL_RECEIVE_COND 3
-
-#define CH_A_XMIT_BUFF_EMPTY 4
-#define CH_A_EXT_STAT_CHANGE 5
-#define CH_A_RECEIVE_CHAR_AVAILABLE 6
-#define CH_A_SPECIAL_RECEIVE_COND 7
+int total_scc_received_chars = 0; // Total number of characters received from the SCC ports since the emulator started.
 
 #define RR3_IP_B_STAT 0x01 // Ext/status int pending, chan B
 #define RR3_IP_B_TX 0x02   // Transmit int pending, chan B
@@ -218,10 +240,9 @@ void scc_channel_reset_port(unsigned int port);
 void initialize_scc(int actual);
 void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data);
 uint8 lisa_rb_Oxd200_sccz8530(uint32 address);
-void scc_control_loop(void);
 void dump_scc(void);
 
-//char read_serial_port(unsigned int port); //(jamesdenton) This was declared twice (first in ~214)
+// char read_serial_port(unsigned int port); //(jamesdenton) This was declared twice (first in ~214)
 char read_serial_port_nothing(unsigned int port);
 char read_serial_port_imagewriter(unsigned int port);
 char read_serial_port_loopbackplug(unsigned int port);
@@ -241,7 +262,7 @@ void set_baud_rate(int port, uint32 baud);
 extern char read_serial_port_telnetd(unsigned int port);
 extern void write_serial_port_telnetd(unsigned int port, char c);
 extern int poll_telnet_serial_read(int portnum);
- 
+
 extern char read_serial_port_shell(unsigned int port);
 extern void write_serial_port_shell(unsigned int port, char c);
 
@@ -262,7 +283,7 @@ extern char read_serial_port_tty(unsigned int port);
 int poll_telnet_serial_read(int portnum) { return 0; }
 #endif
 
-//void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
+// void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
 void write_serial_port_terminal(unsigned int port, char data);
 char read_serial_port_terminal(unsigned int port);
 
@@ -282,29 +303,6 @@ static inline uint8 reversebit(uint8 c)
   c = (c & 0xcc) >> 2 | (c & 0x33) << 2;
   c = (c & 0xaa) >> 1 | (c & 0x55) << 1;
   return c;
-}
-
-static inline uint8 BITREVERSE(uint8 d)
-{
-#ifdef __POWERPC__
-  return d;
-#else
-  return reversebit(d) & 0xff;
-#endif
-}
-
-#ifdef BYTES_HIGHFIRST
-#define BITORD(x) (BITREVERSE(x))
-#else
-#define BITORD(x) (x)
-#endif
-
-uint16 crc16(uint16 crc, uint8 data)
-{
-  crc = (SWAP16(crc)) ^ (BITREVERSE(data));
-  crc ^= (crc & 0x00f0) >> 4;
-  crc ^= (crc << 12);
-  return crc ^ (((crc & 0x00ff) << 4) << 1);
 }
 
 int verifybaud(int baud)
@@ -358,22 +356,22 @@ void scc_hardware_reset_port(unsigned int port)
 {
   register uint8 d;
 
-  d = BITORD(scc_r[port].r[0]);
-  scc_r[port].r[0] = BITORD((d & (8 | 16 | 32 | 128)) | 64 | 4);
-  d = BITORD(scc_r[port].r[1]);
-  scc_r[port].r[1] = BITORD((d & 1) | 2 | 4);
-  d = BITORD(scc_r[port].r[10]);
-  scc_r[port].r[10] = BITORD(d & 64);
+  d = scc_r[port].r[0];
+  scc_r[port].r[0] = (d & (8 | 16 | 32 | 128) | 64 | 4);
+  d = scc_r[port].r[1];
+  scc_r[port].r[1] = (d & 1 | 2 | 4);
+  d = scc_r[port].r[10];
+  scc_r[port].r[10] = d & 64;
 
-  scc_r[port].r[3] = 0; // no need to use bitord, 0 is 0 no matter how you flip it. :)
+  scc_r[port].r[3] = 0;
   scc_w[port].w[0] = 0;
   scc_w[port].w[10] = 0;
 
-  d = BITORD(scc_w[port].w[1]);
-  scc_w[port].w[1] = BITORD(d & (4 | 32));
+  d = scc_w[port].w[1];
+  scc_w[port].w[1] = d & (4 | 32);
 
-  scc_w[port].w[11] = BITORD(16);
-  scc_w[port].w[15] = BITORD(255 - 7);
+  scc_w[port].w[11] = 16;
+  scc_w[port].w[15] = 255 - 7;
 
   // wr2 is itself.
   // wr6 is itself
@@ -381,19 +379,19 @@ void scc_hardware_reset_port(unsigned int port)
   // wr12 is itself
   // wr13 is itself
 
-  d = BITORD(scc_w[port].w[3]);
-  scc_w[port].w[3] = BITORD(d & 254);
-  d = BITORD(scc_w[port].w[4]);
-  scc_w[port].w[4] = BITORD(d | 4);
-  d = BITORD(scc_w[port].w[5]);
-  scc_w[port].w[5] = BITORD(d & (64 | 32 | 1));
-  d = BITORD(scc_w[port].w[17]);
-  scc_w[port].w[17] = BITORD(32);
-  d = BITORD(scc_w[port].w[9]);
-  scc_w[port].w[9] = BITORD((d & 3) | 128 | 64);
+  d = scc_w[port].w[3];
+  scc_w[port].w[3] = d & 254;
+  d = scc_w[port].w[4];
+  scc_w[port].w[4] = d | 4;
+  d = scc_w[port].w[5];
+  scc_w[port].w[5] = d & (64 | 32 | 1);
+  d = scc_w[port].w[17];
+  scc_w[port].w[17] = 32;
+  d = scc_w[port].w[9];
+  scc_w[port].w[9] = (d & 3 | 128 | 64);
 
-  d = BITORD(scc_w[port].w[14]);
-  scc_w[port].w[14] = BITORD((d & (128 | 64)) | (32 | 16));
+  d = scc_w[port].w[14];
+  scc_w[port].w[14] = (d & (128 | 64) | (32 | 16));
 
   irq_on_next_rx_char[port] = 0;
 
@@ -405,12 +403,12 @@ void scc_channel_reset_port(unsigned int port)
 {
   register uint8 d;
 
-  d = BITORD(scc_r[port].r[0]);
-  scc_r[port].r[0] = BITORD((d & (8 | 16 | 32 | 128)) | 64 | 4);
-  d = BITORD(scc_r[port].r[1]);
-  scc_r[port].r[1] = BITORD((d & 1) | 2 | 4);
-  d = BITORD(scc_r[port].r[10]);
-  scc_r[port].r[10] = BITORD(d & 64);
+  d = scc_r[port].r[0];
+  scc_r[port].r[0] = (d & (8 | 16 | 32 | 128) | 64 | 4);
+  d = scc_r[port].r[1];
+  scc_r[port].r[1] = (d & 1 | 2 | 4);
+  d = scc_r[port].r[10];
+  scc_r[port].r[10] = d & 64;
 
   scc_r[port].r[3] = 0;
   scc_w[port].w[0] = 0;
@@ -421,29 +419,29 @@ void scc_channel_reset_port(unsigned int port)
   // wr12=wr12
   // wr13=wr13
 
-  d = BITORD(scc_w[port].w[1]);
-  scc_w[port].w[1] = BITORD(d & (4 | 32));
-  d = BITORD(scc_w[port].w[3]);
-  scc_w[port].w[3] = BITORD(d & 254);
-  d = BITORD(scc_w[port].w[4]);
-  scc_w[port].w[4] = BITORD(d | 4);
-  d = BITORD(scc_w[port].w[5]);
-  scc_w[port].w[5] = BITORD(d & (64 | 32 | 1));
+  d = scc_w[port].w[1];
+  scc_w[port].w[1] = d & (4 | 32);
+  d = scc_w[port].w[3];
+  scc_w[port].w[3] = d & 254;
+  d = scc_w[port].w[4];
+  scc_w[port].w[4] = d | 4;
+  d = scc_w[port].w[5];
+  scc_w[port].w[5] = d & (64 | 32 | 1);
 
-  d = BITORD(scc_w[port].w[17]);
-  scc_w[port].w[17] = BITORD(32);
+  d = scc_w[port].w[17];
+  scc_w[port].w[17] = 32;
 
-  d = BITORD(scc_w[0].w[9]);
-  scc_w[port].w[9] = BITORD(d & (255 - 32));
-  d = BITORD(scc_w[port].w[10]);
-  scc_w[port].w[10] = BITORD(d & (64 | 32));
-  d = BITORD(scc_w[port].w[11]);
-  scc_w[port].w[11] = BITORD(16);
+  d = scc_w[0].w[9];
+  scc_w[port].w[9] = d & (255 - 32);
+  d = scc_w[port].w[10];
+  scc_w[port].w[10] = d & (64 | 32);
+  d = scc_w[port].w[11];
+  scc_w[port].w[11] = 16;
 
-  d = BITORD(scc_w[port].w[14]);
-  scc_w[port].w[14] = BITORD((d & (128 | 64)) | (32 | 16));
-  d = BITORD(scc_w[port].w[15]);
-  scc_w[port].w[15] = BITORD(255 - 7);
+  d = scc_w[port].w[14];
+  scc_w[port].w[14] = (d & (128 | 64) | (32 | 16));
+  d = scc_w[port].w[15];
+  scc_w[port].w[15] = 255 - 7;
 
   irq_on_next_rx_char[port] = 0;
   scc_bits_per_char_mask[0] = 255;
@@ -451,7 +449,7 @@ void scc_channel_reset_port(unsigned int port)
 }
 
 extern char read_serial_port_terminal(unsigned int port);
-//extern void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
+// extern void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
 extern void write_serial_port_terminal(unsigned int port, char data);
 
 void read_port_if_ready_nothing(unsigned int port)
@@ -464,9 +462,19 @@ void rx_char_available(int port) { RX_CHAR_AVAILABLE(port); }
 
 void read_port_if_ready_shell(unsigned int port)
 {
+  if (fliflo_buff_is_full(&SCC_READ[port]))
+    return;
+  if (port == 0 && waiting_for_lisa_to_read_port_b)
+    return;
+  if (port == 0 && (cpu68k_clocks - port_b_last_lisa_read_clock_timestamp < SCC_MIN_CYCLES_BETWEEN_READS))
+    return;
   int data = read_serial_port_shell(port);
   if (data > -1)
   {
+    if (port == 0)
+    {
+      waiting_for_lisa_to_read_port_b = 1;
+    }
     // ALERT_LOG(0,"---vvv---------------------------------------------------------------------------------------------------------------");
     // fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
     fliflo_buff_add(&SCC_READ[port], (uint8)(data)&scc_bits_per_char_mask[port]);
@@ -483,9 +491,19 @@ void read_port_if_ready_shell(unsigned int port)
 
 void read_port_if_ready_pty(unsigned int port)
 {
+  if (fliflo_buff_is_full(&SCC_READ[port]))
+    return;
+  if (port == 0 && waiting_for_lisa_to_read_port_b)
+    return;
+  if (port == 0 && (cpu68k_clocks - port_b_last_lisa_read_clock_timestamp < SCC_MIN_CYCLES_BETWEEN_READS))
+    return;
   int data = read_serial_port_pty(port);
   if (data > -1)
   {
+    if (port == 0)
+    {
+      waiting_for_lisa_to_read_port_b = 1;
+    }
     // ALERT_LOG(0,"---vvv---------------------------------------------------------------------------------------------------------------");
     // fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
     fliflo_buff_add(&SCC_READ[port], (uint8)(data)&scc_bits_per_char_mask[port]);
@@ -501,15 +519,31 @@ void read_port_if_ready_pty(unsigned int port)
 
 void read_port_if_ready_terminal(unsigned int port)
 {
+  if (fliflo_buff_is_full(&SCC_READ[port]))
+    return;
+  if (port == 0 && waiting_for_lisa_to_read_port_b)
+    return;
+  if (port == 0 && (cpu68k_clocks - port_b_last_lisa_read_clock_timestamp < SCC_MIN_CYCLES_BETWEEN_READS))
+    return;
   if (fliflo_buff_has_data(&SCC_READ[port]))
     RX_CHAR_AVAILABLE(port);
 }
 
 void read_port_if_ready_tty(unsigned int port)
 {
+  if (fliflo_buff_is_full(&SCC_READ[port]))
+    return;
+  if (port == 0 && waiting_for_lisa_to_read_port_b)
+    return;
+  if (port == 0 && (cpu68k_clocks - port_b_last_lisa_read_clock_timestamp < SCC_MIN_CYCLES_BETWEEN_READS))
+    return;
   int data = read_serial_port_tty(port);
   if (data > -1)
   {
+    if (port == 0)
+    {
+      waiting_for_lisa_to_read_port_b = 1;
+    }
     fliflo_buff_add(&SCC_READ[port], (uint8)(data)&scc_bits_per_char_mask[port]);
     RX_CHAR_AVAILABLE(port);
     ALERT_LOG(0, "Received 0x%02x (%d) %c from scc port:%d (mask:%02x) serial_b fliflo size is:%d",
@@ -523,16 +557,26 @@ void read_port_if_ready_tty(unsigned int port)
 
 void read_port_if_ready_telnetd(unsigned int port)
 {
+  if (fliflo_buff_is_full(&SCC_READ[port]))
+    return;
+  if (port == 0 && waiting_for_lisa_to_read_port_b)
+    return;
+  if (port == 0 && (cpu68k_clocks - port_b_last_lisa_read_clock_timestamp < SCC_MIN_CYCLES_BETWEEN_READS))
+    return;
   int data = poll_telnet_serial_read(port);
   if (data > -1)
   {
+    if (port == 0)
+    {
+      waiting_for_lisa_to_read_port_b = 1;
+    }
     fliflo_buff_add(&SCC_READ[port], (uint8)(data)&scc_bits_per_char_mask[port]);
     RX_CHAR_AVAILABLE(port);
     DEBUG_LOG(0, "Received %02x %c from scc port:%d (mask:%02x) serial fliflo size is:%d",
               (uint8)(data),
               ((data > 31) ? ((uint8)(data)) : '.'),
-              port, scc_bits_per_char_mask[0],
-              fliflo_buff_size(&SCC_READ[0]));
+              port, scc_bits_per_char_mask[port],
+              fliflo_buff_size(&SCC_READ[port]));
     // fliflo_dump(stderr,&SCC_READ[0],"added to queue");
     // ALERT_LOG(0,"-----------------------------------------------");
   }
@@ -552,6 +596,8 @@ void initialize_scc(int actual)
     // xonenabled[0]=0; xonenabled[1]=0;
 
     DEBUG_LOG(0, "Allocating FIFO's");
+    // TO DO: The serial receiving code in this file is written so that we "feed" 1 byte at a time to the Lisa software, and then wait for Lisa to "get it".
+    // Hence this buffer is an overkill. The code could be simplified to use a single byte variable for each port. Same for sending.
     if (fliflo_buff_create(&SCC_READ[0], SCC_BUFFER_SIZE))
     {
       EXIT(404, 0, "Out of memory!");
@@ -578,10 +624,9 @@ void initialize_scc(int actual)
       scc_r[0].r[i] = 0;
     }
 
-    sentbytes[0] = 0;
-    sentbytes_start[0] = cpu68k_clocks;
-    sentbytes[1] = 0;
-    sentbytes_start[1] = cpu68k_clocks;
+    waiting_for_lisa_to_read_port_b = 0;
+    port_b_last_lisa_read_clock_timestamp = 0;
+    total_scc_received_chars = 0;
 
     // set handlers to default methods
     scc_fn[0].set_dtr = set_dtr;                         //   void (*set_dtr)(unsigned int port, uint8 value);
@@ -695,7 +740,7 @@ void initialize_scc(int actual)
       break;
 
 #else
-      // fallthrough to default for unsupported on windows
+    // fallthrough to default for unsupported on windows
 #endif
     default: // fallthrough, includes SCC_NOTHING.
       // ALERT_LOG(0,"Not sure what to connect to this port");
@@ -708,7 +753,8 @@ void initialize_scc(int actual)
   DEBUG_LOG(0, "r %p %p w %p %p", SCC_READ[0].buffer, &SCC_READ[1].buffer, SCC_WRITE[0].buffer, SCC_WRITE[1].buffer);
 }
 
-void scc_control_loop(void)
+// No longer invoked (from irq.c) because it does nothing useful.
+void scc_control_loop_unused(void)
 {
   // If IRQ's are pending, this must be set before the IRQ gets issued.
   // after the IRQ is issued, they must be cleared?
@@ -1001,54 +1047,18 @@ static inline void avoid_rom_scc_tests(void)
 
 int get_scc_pending_irq(void)
 {
-  int data;
+  // int data;
 
   if (!scc_w[0].s.wr9.r.MIE)
   {
     DEBUG_LOG(0, "MIE is off");
     return 0;
   } // Master IRQ Enable bit - if not set, no IRQ's to return.
-  // prevent sending too many bytes in one shot for LisaTerminal
-  if (running_lisa_os == LISA_OFFICE_RUNNING)
-  {
-    // LisaTerminal or perhaps LOS drops bytes if more than 64 are sent in a single chunk. Keep track so we can slow it down.
-    // another issue is that any ANSI/vt100 seq it receives that it doesn't recognize causes it to abort all output until the next
-    // line or something like that.
-    // if (IMSK!=6) {sentbytes[0]=0; sentbytes[1]=0; sentbytes_start[0]=cpu68k_clocks; sentbytes_start[1]=cpu68k_clocks;}
-
-#define CHARSLIM 16
-#define CLKCYLIM 9500
-
-    if (sentbytes[0] > CHARSLIM || sentbytes[1] > CHARSLIM)
-    { // 12,15000 from seq 100 200 we get upto 111 + 2 bytes before it cuts off so 43 bytes (with nl's)
-      // if we still lose bytes, change this threshhold of 1500 , or lower number of bytes
-      if (cpu68k_clocks - sentbytes_start[0] < CLKCYLIM || cpu68k_clocks - sentbytes_start[1] < CLKCYLIM)
-      {
-        ALERT_LOG(0, "\n\nlimiting scc input");
-        return 0;
-      }
-      ALERT_LOG(0, "\n\nresuming scc input");
-      sentbytes[0] = 0;
-      sentbytes[1] = 0;
-    }
-  }
-  else
-  {
-    sentbytes[0] = 0;
-    sentbytes[1] = 0;
-  }
-
-  if (sentbytes[0] < CHARSLIM)
-  {
-    scc_fn[0].read_port_if_ready(0);
-  }
-  if (sentbytes[1] < CHARSLIM)
-  {
-    scc_fn[1].read_port_if_ready(1);
-  }
+  scc_fn[0].read_port_if_ready(0);
+  scc_fn[1].read_port_if_ready(1);
 
   // if IRQ on next char is enabled and the fliflo has data, flag IRQ
-  if ((irq_on_next_rx_char[0] && HAS_DATA(0) && sentbytes[0] < CHARSLIM) ||
+  if ((irq_on_next_rx_char[0] && HAS_DATA(0)) ||
       ((scc_w[0].s.wr1.r.rxintmode) && HAS_DATA(0)))
   {
     DEBUG_LOG(0, "chb has data");
@@ -1059,7 +1069,7 @@ int get_scc_pending_irq(void)
   else
     scc_r[1].s.rr3.r.ch_b_ext_status_irq_pending = 0; // 20051111
 
-  if ((irq_on_next_rx_char[1] && HAS_DATA(1) && sentbytes[1] < CHARSLIM) ||
+  if ((irq_on_next_rx_char[1] && HAS_DATA(1)) ||
       ((scc_w[1].s.wr1.r.rxintmode) && HAS_DATA(1)))
   {
     DEBUG_LOG(0, "cha has data");
@@ -1089,7 +1099,7 @@ int get_scc_pending_irq(void)
 
 void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data)
 {
-  uint8 access, port = 0, odata, regnum = 0; // d,
+  uint8 access, port = 0; // d,
 
   avoid_rom_scc_tests();
 
@@ -1233,11 +1243,8 @@ void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data)
     return;
   }
 
-  odata = data;
-  data = BITORD(data); // do this here, so the bit fields will work properly.  If done before dealing with data
-                       // it would reverse the data, which would be a bad idea. :)
-
-  regnum = scc_w[port].s.wr0.r.reg;
+  uint8 odata = data;
+  uint8 regnum = scc_w[port].s.wr0.r.reg;
   if (scc_w[port].s.wr0.r.cmd == 1)
   {
     regnum |= 8;
@@ -1298,8 +1305,8 @@ void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data)
       break;
     case 5:
       DEBUG_LOG(0, "WR0:Clear next xmit pending irq");
-      scc_r[port].s.rr3.r.ch_a_tx_irq_pending = 0;
-      scc_r[!port].s.rr3.r.ch_a_tx_irq_pending = 0;
+      scc_r[1].s.rr3.r.ch_a_tx_irq_pending = 0;
+      scc_r[1].s.rr3.r.ch_a_tx_irq_pending = 0;
       scc_w[port].s.wr0.r.cmd = 0; // clear command for next cycle (except for previous highpoint)
 
       // 2006.08.07
@@ -1655,16 +1662,6 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
 
   if (access) //--------------- Data Port ---------------------------------------------------------------------------------
   {
-    if (running_lisa_os == LISA_OFFICE_RUNNING)
-    {
-      if (!sentbytes[port])
-      {
-        sentbytes_start[port] = cpu68k_clocks;
-      }
-
-      sentbytes[port]++;
-      ALERT_LOG(0, "port:%d sentbytes:%d startclk:%lld now:%lld dif:%lld", port, sentbytes[port], sentbytes_start[port], cpu68k_clocks, cpu68k_clocks - sentbytes_start[port]);
-    }
 
     if (scc_w[0].s.wr9.r.soft_int_ack)
     {
@@ -1682,29 +1679,45 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
     } // can't read anything unless this is on.
     else
     {
-      uint8 c;
+      uint8 character_read;
 
       if (HAS_DATA(port))
       {
         /// ALERT_LOG(0,"------------------------------ reading from fliflo for port %d---------------",port);
         // fliflo_dump(stderr,&SCC_READ[0],"BEFORE get from queue");
-        c = fliflo_buff_get(&SCC_READ[port]) & scc_bits_per_char_mask[port];
-        // ALERT_LOG(0,"Read %02x from queue",c);
-        // fliflo_dump(stderr,&SCC_READ[0],"AFTER get from queue");
-        // ALERT_LOG(0,"-----------------------------------------------------------------------------");
+
+        // This is the only place where we consume (remove) data from the receive/read/rx fliflo buffer.
+        character_read = fliflo_buff_get(&SCC_READ[port]) & scc_bits_per_char_mask[port];
+        total_scc_received_chars++;
+        if (total_scc_received_chars % 1000 == 0)
+        {
+          ALERT_LOG(0, "Lisa consumed %d chars so-far from the 'recieve' SCC ports.", total_scc_received_chars);
+        }
+        if (port == 0)
+        {
+          waiting_for_lisa_to_read_port_b = 0; // reset this flag, since Lisa just read a char from the fliflo buffer.
+          port_b_last_lisa_read_clock_timestamp = cpu68k_clocks;
+        }
       }
       else
       {
-        ALERT_LOG(0, "fliflo is empty reading from port directly -------------------------------------");
-        c = scc_fn[port].read_serial_port(port); // if nothing already waiting in fliflo, call read fn as needed.
+        // This should never happen if the SCC emulation is working correctly.
+        char message[] = "Lisa tried to read a byte from serial port X, but there is no incoming data.\n"
+                         "This is an emulator error. We recommend restarting the emulator.\n";
+        message[43] = (port == 0) ? 'B' : 'A';
+        messagebox(message, "Emulator error!");
+        character_read = 'X';
+        ALERT_LOG(0, "Warning: flifo RX buffer for port %d is empty, but Lisa is trying to read from it! Returning the character %c", port, character_read);
       }
-      ALERT_LOG(0, "read char %02x %c from fifo or fn port:%d fliflo size is:%d pc:%08x",
-                c, (c > 31 ? c : '.'),
+      ALERT_LOG(0, "read char %02x %c from flifo on port:%d fliflo size is:%d pc:%08x",
+                character_read, (character_read > 31 ? character_read : '.'),
                 port, fliflo_buff_size(&SCC_READ[port]), pc24);
 
-      return c;
+      return character_read;
     }
   }
+
+  // Below is the control (not data) port access.
 
   regnum = scc_w[port].s.wr0.r.reg;
   if (scc_w[port].s.wr0.r.cmd == 1)
@@ -1726,7 +1739,7 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       DEBUG_LOG(0, "Read from register 4");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_w[port].w[4]));
+        return (scc_w[port].w[4]);
 #endif
       // to return rr0
       /* FALLTHRU */
@@ -1734,70 +1747,26 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
     case 0:
       DEBUG_LOG(0, "Read from register 0");
 
-      // need to insert other pollers here for polled I/O
-      // poll_telnet_serial_read(port);
+    // need to insert other pollers here for polled I/O
+    // poll_telnet_serial_read(port);
 #ifndef __MSVCRT__
       if (serial_b == SCC_TELNETD)
         read_port_if_ready_telnetd(0);
-      //               { int data=poll_telnet_serial_read(0);
-      //                 if (data>-1)
-      //                        {
-      //                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
-      //                            ALERT_LOG(0,"Received %02x %c from scc port:%d",
-      //                                    (uint8)(data),
-      //                                    ((data >31) ? ((uint8)(data)):'.'),
-      //                                    port);
-      //                        }
-      //               }
-
       if (serial_a == SCC_TELNETD)
         read_port_if_ready_telnetd(1);
-      //               {
-      //                 int data=poll_telnet_serial_read(1);
-      //                 if (data>-1) {fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
-      //                               ALERT_LOG(0,"Received %02x %c from scc port:%d",
-      //                                    (uint8)(data),
-      //                                    ((data >31) ? ((uint8)(data)):'.'),
-      //                                    port);
-      //                        }
-      //               }
- 
       if (serial_b == SCC_SHELL)
         read_port_if_ready_shell(0);
-      //               { int data=read_serial_port_shell(0); // ::TODO:: this sometimes hangs - read gets called when it should not be even though we check for presence of data avail
-      //                 if (data>-1)
-      //                        {
-      //                            fliflo_buff_add(&SCC_READ[0],(uint8)(data) & scc_bits_per_char_mask[0]);
-      //                            ALERT_LOG(0,"Received %02x %c from scc port:%d pc:%08x",
-      //                                    (uint8)(data),
-      //                                    ((data >31) ? ((uint8)(data)):'.'),
-      //                                   port,pc24);
-      //                        }
-      //               }
- 
       if (serial_a == SCC_SHELL)
         read_port_if_ready_shell(1);
-      //               {
-      //                 int data=read_serial_port_shell(1);
-      //                 if (data>-1) {fliflo_buff_add(&SCC_READ[1],(uint8)(data) & scc_bits_per_char_mask[1]);
-      //                               ALERT_LOG(0,"Received %02x %c from scc port:%d",
-      //                                    (uint8)(data),
-      //                                    ((data >31) ? ((uint8)(data)):'.'),
-      //                                    port);
-      //                        }
-      //               }
-
       if (serial_b == SCC_PTY)
         read_port_if_ready_pty(0);
       if (serial_a == SCC_PTY)
         read_port_if_ready_pty(1);
-
       if (serial_b == SCC_TTY)
         read_port_if_ready_tty(0);
       if (serial_a == SCC_TTY)
         read_port_if_ready_tty(1);
 #endif
-
       if (serial_b == SCC_TERMINAL)
         read_port_if_ready_terminal(0);
       if (serial_a == SCC_TERMINAL)
@@ -1841,13 +1810,13 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
                   xonenabled[port], xoffflag[port], fliflo_buff_has_data(&SCC_READ[port]));
       }
 
-      return BITORD(scc_r[port].r[0]);
+      return scc_r[port].r[0];
 
     case 5:
       DEBUG_LOG(0, "Read from register 5");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_w[port].w[5]));
+        return (scc_w[port].w[5]);
 #endif
       // fall through to return rr1
       /* FALLTHROUGH */
@@ -1874,13 +1843,13 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
                 scc_r[port].s.rr1.r.crc_framing_error,
                 scc_r[port].s.rr1.r.sdlc_end_of_frame);
 
-      return BITORD(scc_r[port].r[1]);
+      return scc_r[port].r[1];
 
     case 6:
       DEBUG_LOG(0, "Read from register 6");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_r[port].r[6]));
+        return (scc_r[port].r[6]);
 #endif
       // fall through to rr2
       /* FALLTHROUGH */
@@ -1907,8 +1876,8 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
        */
       // V3|V2|V1 Status High/Status Low =0
       // V4|V5|V6 Status High/Status Low =1
-      DEBUG_LOG(0, "About to read register 2 which contains %02x, (reordered is %02x) on port %d - z8530_last_irq_status_bits is:%02x",
-                scc_r[port].r[2], BITORD(scc_r[port].r[2]),
+      DEBUG_LOG(0, "About to read register 2 which contains %02x on port %d - z8530_last_irq_status_bits is:%02x",
+                scc_r[port].r[2],
                 port, z8530_last_irq_status_bits);
 
       if (port)
@@ -1927,7 +1896,7 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
         /*
 
         */
-        uint8 r2 = BITORD(scc_r[port].r[2]);
+        uint8 r2 = scc_r[port].r[2];
 
         scc_r[0].r[2] = 0; /// 200608-8 <--- here here here here
         DEBUG_LOG(0, "PORT B, will include status bits");
@@ -1945,8 +1914,8 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
           scc_r[0].s.rr2.r.v2 = (z8530_last_irq_status_bits & 4) ? 1 : 0;
           scc_r[0].s.rr2.r.v3 = (z8530_last_irq_status_bits & 8) ? 1 : 0;
         }
-        DEBUG_LOG(0, "Returning %02x which reordered is %02x from register %d on port %d",
-                  scc_r[port].r[2], BITORD(scc_r[port].r[2]),
+        DEBUG_LOG(0, "Returning %02x from register %d on port %d",
+                  scc_r[port].r[2],
                   2, port);
 
         // if software interrupt ack is on, it clears the IRQ on access to rr2.
@@ -1966,20 +1935,23 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       DEBUG_LOG(0, "Read from register 7");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_r[port].r[7]));
+        return (scc_r[port].r[7]);
 #endif
       // fall through to rr3
       /* FALLTHROUGH */
     case 3:
       DEBUG_LOG(0, "Read from register 3 irq pending");
       {
-        uint8 ret = BITORD(scc_r[port].r[3]); // IRQ pending.  These must be set by loop IRQ routine!
+        uint8 ret = scc_r[port].r[3]; // IRQ pending.  These must be set by loop IRQ routine!
         scc_r[port].r[3] = 0;
         return ret;
       }
 
     case 8:
       DEBUG_LOG(0, "Read from register 8");
+      // TO DO: This needs some investigation.
+      // We are in the "control registers read" access path, but we are returning the data from the read buffer.
+      // In addition, we are not removing from the read buffer (only peeking), which seems wrong.
       scc_r[port].r[8] = fliflo_buff_peek(&SCC_READ[port]);
       return scc_r[port].r[8];
 
@@ -1987,39 +1959,39 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       DEBUG_LOG(0, "Read from register 14");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_w[port].w.w7prime));
+        return (scc_w[port].w.w7prime);
 #endif
       /* FALLTHROUGH */
     case 10:
       DEBUG_LOG(0, "Read from register 10 - returning 0 - sdlc not implemented");
       return 0;
-      // return  BITORD(scc_r[port].r[10]);             // sdlc not implemented
+      // return  scc_r[port].r[10];             // sdlc not implemented
 
     case 12:
       DEBUG_LOG(0, "Read from register 12");
-      return BITORD(scc_w[port].w[12]); // return wr12
+      return scc_w[port].w[12]; // return wr12
 
     case 9:
       DEBUG_LOG(0, "Read from register 9");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_w[port].w[3]));
+        return (scc_w[port].w[3]);
 #endif
       /* FALLTHROUGH */
     case 13:
       DEBUG_LOG(0, "Read from register 13"); // return wr13
-      return BITORD(scc_w[port].w[13]);
+      return scc_w[port].w[13];
 
     case 11:
       DEBUG_LOG(0, "Read from register 11");
 #ifdef ENHANCED_Z85C30
       if (scc_r[port].w[15] & 4)
-        return BITORD((scc_w[port].w[10]));
+        return (scc_w[port].w[10]);
 #endif
       /* FALLTHROUGH */
     case 15:
       DEBUG_LOG(0, "Read from register 15");
-      return BITORD(scc_w[port].w[15]); // return wr15
+      return scc_w[port].w[15]; // return wr15
     }
 
 #ifdef ENHANCED_Z85C30
