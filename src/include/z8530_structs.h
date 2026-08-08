@@ -46,7 +46,7 @@
 #define SCC_TERMINAL 23 // terminal window
 #define SCC_SHELL 24    // shell
 
-#define SCC_BUFFER_SIZE 32768
+#define SCC_BUFFER_SIZE 1
 
 #define SERIAL_PORT_A_DATA 0xFCD247
 #define SERIAL_PORT_A_CONTROL 0xFCD243
