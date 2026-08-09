@@ -7439,7 +7439,7 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
 
     info.SetDescription(description);
     info.SetCopyright(_T("\xa9 2026 Friends of Ray Arachelian"));
-    info.SetWebSite(_T("https://lisaem.sunder.net"));
+    info.SetWebSite(_T("https://github.com/arcanebyte/lisaem"));
 
     info.AddDeveloper(_T("Ray Arachelian - Emulator"));
     info.AddDeveloper(_T("James Ponder - 68K core"));
