@@ -74,6 +74,11 @@
 #define _XOPEN_SOURCE 600
 #define __USE_BSD
 
+// Required on macOS for cfmakeraw and other BSD termios functions
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
+
 // Claude says O_NDELAY is equivalent to O_NONBLOCK on macOS systems
 // Create a compatibility shim
 #ifndef O_NDELAY
