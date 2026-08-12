@@ -3045,7 +3045,7 @@ void set_hidpi_scale(void)
         ALERT_LOG(0, "opened mousescale.txt, reading.");
         while (!feof(fh))
         {
-          fscanf(fh, "%d,%f\n", &d, &f);
+          if (fscanf(fh, "%d,%f\n", &d, &f) != 2) break;
           switch (d)
           {
           case 25:

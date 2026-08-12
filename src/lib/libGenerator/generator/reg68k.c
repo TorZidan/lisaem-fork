@@ -926,7 +926,7 @@ void extprintregs(FILE *buglog, char *tag)
 
 void dumpram(char *reason)
 {
-  FILE *ramdump, *ramdumpM0, *ramdumpM1, *ramdumpM2, *ramdumpM3;
+  FILE *ramdump = NULL;
   char filename[256];
   uint32 i, j; //,k;
   uint16 slr, sor;
@@ -1023,29 +1023,25 @@ void dumpram(char *reason)
   fflush(ramdump);
   fclose(ramdump);
 
+  FILE *ramdumpM0, *ramdumpM1, *ramdumpM2, *ramdumpM3 = NULL;
+
   snprintf(filename, 256, "lisaem-output-mmu0-ramdump-%s-%08lx.%016llx.%fMB.bin", reason, (long)pc24, (long long)cpu68k_clocks, (float)(maxlisaram / 1024.0));
   ramdumpM0 = fopen(filename, "wb");
   if (!ramdumpM0)
-  {
-    fclose(ramdump);
     return;
-  }
 
   snprintf(filename, 256, "lisaem-output-mmu1-ramdump-%s-%08lx.%016llx.%fMB.bin", reason, (long)pc24, (long long)cpu68k_clocks, (float)(maxlisaram / 1024.0));
-
   ramdumpM1 = fopen(filename, "wb");
   if (!ramdumpM1)
   {
-    fclose(ramdump);
     fclose(ramdumpM0);
     return;
   }
-  snprintf(filename, 256, "lisaem-output-mmu2-ramdump-%s-%08lx.%016llx.%fMB.bin", reason, (long)pc24, (long long)cpu68k_clocks, (float)(maxlisaram / 1024.0));
 
+  snprintf(filename, 256, "lisaem-output-mmu2-ramdump-%s-%08lx.%016llx.%fMB.bin", reason, (long)pc24, (long long)cpu68k_clocks, (float)(maxlisaram / 1024.0));
   ramdumpM2 = fopen(filename, "wb");
   if (!ramdumpM2)
   {
-    fclose(ramdump);
     fclose(ramdumpM0);
     fclose(ramdumpM1);
     return;
@@ -1055,13 +1051,11 @@ void dumpram(char *reason)
   ramdumpM3 = fopen(filename, "wb");
   if (!ramdumpM3)
   {
-    fclose(ramdump);
     fclose(ramdumpM0);
-    fclose(ramdumpM3);
+    fclose(ramdumpM1);
+    fclose(ramdumpM2);
     return;
   }
-
-  fprintf(ramdump, "context:%ld segment1:%ld, segment2:%ld, start:%ld pc24:%08lx\n\n", (long)context, (long)segment1, (long)segment2, (long)start, (long)pc24);
 
   // each context=16M, so this will be slow - could make this go faster by using custom MMU translation code and doing one segment at a time, but, meh,
   // this is only used for debugging, so, why bother.
