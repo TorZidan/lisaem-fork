@@ -111,8 +111,9 @@ int irq_on_next_rx_char[2];
 // Note: We don't throttle receiving data on port A (port 1).
 static uint8 waiting_for_lisa_to_read_port_b = 0;        // Set to 1 when we have received a byte on port B and are waiting for the Lisa to read it. Cleared when the Lisa reads the byte.
 static XTIMER port_b_last_lisa_read_clock_timestamp = 0; // The cpu68k_clocks at the time when Lisa consumed a byte.
-// Longer delays improve the reliability of receiving data, but make the transfer slower.  500000 seems to be a good compromise.
-#define SCC_MIN_CYCLES_BETWEEN_READS 500000
+// Longer delays improve the reliability of receiving data, but make the transfer slower.  
+// 1000000 seems to be a good compromise.  It equals to just 5 bytes transferred per second at 5MHz, but who runs LisaEm at that speed?
+#define SCC_MIN_CYCLES_BETWEEN_READS 1000000
 
 int total_scc_received_chars = 0; // Total number of characters received from the SCC ports since the emulator started.
 
@@ -1253,7 +1254,9 @@ void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data)
   DEBUG_LOG(0, "Register for SCC access is %02x - register 0 is: %02x, writing %02x to reg %d", regnum, scc_w[port].w[0],
             odata, regnum);
 
-  scc_w[port].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
+  // "the pointer bits may be written in either channel because only one set exists", hence we reset it in both channels.
+  scc_w[0].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
+  scc_w[1].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
 
   switch (regnum)
   {
@@ -1726,7 +1729,11 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
     scc_w[port].s.wr0.r.cmd = 0;
   }
   DEBUG_LOG(0, "SRC:SCC: access:%d port %d regnum:%d  wr0 is %02x", access, port, regnum, scc_w[port].w[0]);
-  scc_w[port].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
+
+  // "the pointer bits may be written in either channel because only one set exists", hence we reset it in both channels.
+  scc_w[0].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
+  scc_w[1].s.wr0.r.reg = 0; // reset register pointer back to zero for next round.
+
   if (scc_w[port].s.wr0.r.cmd == 1)
     scc_w[port].s.wr0.r.cmd = 0; // reset highpoint for next command
 
@@ -1780,7 +1787,7 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       scc_r[port].s.rr0.r.sync_hunt = 0;
       scc_r[port].s.rr0.r.tx_underrun_eom = (!scc_w[port].s.wr5.r.txenable);
       scc_r[port].s.rr0.r.zero_count = 0;
-
+      
       // sync hunt fakeout
       scc_r[port].s.rr0.r.sync_hunt = (scc_r[port].s.rr0.r.cts && scc_r[port].s.rr0.r.dcd);
       DEBUG_LOG(0, "RR0[%d] 0:rx_char_available:%d,  2:tx_buffer_empty:%d, 3:dcd:%d, 5:cts:%d, 7:break_abort:%d, 4:sync_hunt:%d, 6:tx_underrun_eom:%d, 1:zero_count:%d xonenable:%d xoffflag:%d fliflo_has_data:%d",
