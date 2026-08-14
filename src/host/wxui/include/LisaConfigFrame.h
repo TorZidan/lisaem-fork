@@ -6,6 +6,8 @@
 
 #include "LisaConfig.h"
 
+class wxSimplebook;
+
 /*
  * This class is the GUI equivalent of LisaConfig. You set it up by passing
  * it a LisaConfig instance and it provides an on screen editable
@@ -14,7 +16,7 @@
  * LisaConfig back to disc if it needs to.)
  */
 
-class LisaConfigFrame : public wxFrame
+class LisaConfigFrame : public wxDialog
 {
 public:
     LisaConfigFrame(const wxString &title, LisaConfig *lisaconfig);
@@ -23,13 +25,24 @@ public:
     // creators
     wxPanel *CreateMainConfigPage(wxNotebook *parent);
     wxPanel *CreatePortsConfigPage(wxNotebook *parent);
-    wxPanel *CreateSlotConfigPage(wxNotebook *parent, int slot);
+    wxPanel *CreateSlotConfigPage(wxWindow *parent, int slot);
     wxPanel *CreatePrinterConfigPage(wxNotebook *parent);
 
     void CreateNotebook(wxNotebook *parent);
 
     //          event handlers
-    void OnApply(wxCommandEvent &event);
+    void ApplyChanges();  // commit control values into the LisaConfig (no close)
+    void OnApply(wxCommandEvent &event); // Apply button: commit, stay open
+    void OnOK(wxCommandEvent &event);    // OK button: commit & close
+    void OnControlChanged(wxCommandEvent &event); // any edit -> enable Apply
+    void SetApplyEnabled(bool enabled);
+    void OnCancel(wxCommandEvent &event);          // Cancel: warn if there are unapplied edits
+    void OnSerialChanged(wxCommandEvent &event);   // serial port -> loopback pairing (realtime)
+    void set_profile_path_checked(wxTextCtrl *target, const wxString &path); // validate + set an image path
+    bool path_in_use_elsewhere(const wxString &path, wxTextCtrl *except);    // duplicate-image guard
+    void OnSlotCardChanged(wxCommandEvent &event); // slot card dropdown -> show/hide ports
+    void OnSlotPick(wxCommandEvent &event);        // slot 1/2/3 selector -> switch slotbook page
+    void UpdateSlotVisibility(int slot);           // ports config only when a card is installed
     void OnZapPram(wxCommandEvent &event);
     void OnSavePram(wxCommandEvent &event);
     void OnLoadPram(wxCommandEvent &event);
@@ -49,8 +62,12 @@ public:
     wxPanel *m_panel; // the panel itself
     wxNotebook *thenoteBook;
 
-    wxRadioBox *sloton[4]; // expansion slots, which have cards, and what cards are in them
+    wxChoice *sloton[4];   // per-slot installed-card dropdown (Dual Parallel / Nothing)
                            // using 4 here and skipping 0, so we can be clear about slot[1], slot[2], slot[3].
+    wxPanel *slotports[4]; // per-slot container for the Upper/Lower port config; hidden when no card
+    wxStaticText *slotempty[4]; // per-slot "No card installed" placeholder; shown when no card
+    wxSimplebook *slotbook;     // holds the three slot panels; driven by slotpick
+    wxChoice *slotpick;         // compact 1/2/3 slot selector
 
     wxTextCtrl *m_rompath; // Lisa Boot ROM path
     wxButton *b_rompath;   // button for picking it
@@ -62,9 +79,9 @@ public:
     wxTextCtrl *m_dprompath; // Dual Parallel Expansion Slot ROM
     wxButton *b_dprompath;
 
-    wxRadioBox *kbbox; // keyboard ID
+    wxChoice *kbbox; // keyboard ID
 
-    wxRadioBox *iorombox; // I/O ROM version
+    wxChoice *iorombox; // I/O ROM version
 
     wxRadioBox *cpurambox;
 
@@ -118,6 +135,7 @@ public:
 private:
     LisaConfig *my_lisaconfig;
     wxString slotcard[2];
+    bool m_dirty; // true when controls hold edits not yet committed via Apply/OK
 
     DECLARE_EVENT_TABLE()
 };

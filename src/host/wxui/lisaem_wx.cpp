@@ -149,6 +149,7 @@
 
 #include <wx/wx.h>
 #include <wx/defs.h>
+#include <wx/sysopt.h> // for wxSystemOptions (macOS Open-dialog file-type filter menu)
 #include <wx/image.h>
 #include <wx/icon.h>
 #include <wx/dcbuffer.h>
@@ -715,7 +716,9 @@ public:
   // Event handlers
   //    #ifdef __WXOSX__
   void OnQuit(wxCommandEvent &event);
+  void OnMenuQuit(wxCommandEvent &event); // user Quit: warn if the Lisa is still powered on
   void OnClose(wxCloseEvent &event);
+  bool confirm_quit_while_powered();      // true if OK to quit (off, or user forced)
 
   //    #endif
 
@@ -1067,7 +1070,7 @@ EVT_MENU(ID_PAUSE, LisaEmFrame::OnPause)
 
 // EVT_IDLE(LisaEmFrame::OnIdleEvent)
 EVT_TIMER(ID_EMULATION_TIMER, LisaEmFrame::OnEmulationTimer)
-EVT_MENU(wxID_EXIT, LisaEmFrame::OnQuit)
+EVT_MENU(wxID_EXIT, LisaEmFrame::OnMenuQuit)
 EVT_CLOSE(LisaEmFrame::OnClose)
 END_EVENT_TABLE()
 
@@ -1612,18 +1615,37 @@ void LisaWin::SetVideoMode(int mode)
 extern "C" void close_all_terminals(void);
 
 // if we close the LisaEm window and another window such as preferences or a terminal is open, we get segfault
+// Warn before quitting while the Lisa is still powered on: pulling the plug can
+// leave the guest OS's buffers / ProFile catalog mid-write and corrupt the disk.
+// Returns true if it's OK to proceed (machine is off, or the user chose to force).
+bool LisaEmFrame::confirm_quit_while_powered()
+{
+    if (!running) // 0 = off; 1 = running, 10 = paused both count as powered on
+        return true;
+
+    wxMessageDialog dlg(this,
+                        wxT("Quitting now is like pulling the power cord - unsaved work and "
+                            "disk changes may be lost.\n\n"
+                            "Shut the Lisa down from its desktop (or the power button) first."),
+                        wxT("The Lisa is still powered on"),
+                        wxYES_NO | wxNO_DEFAULT | wxICON_EXCLAMATION);
+    dlg.SetYesNoLabels(wxT("Force Power Off && Quit"), wxT("Cancel"));
+    return (dlg.ShowModal() == wxID_YES);
+}
+
+void LisaEmFrame::OnMenuQuit(wxCommandEvent& event)
+{
+    if (confirm_quit_while_powered())
+        OnQuit(event);
+}
+
 void LisaEmFrame::OnClose(wxCloseEvent& event)
 {
-    /*
-    if (my_LisaConfigFrame) // close any ConfigFrame
-       {
-         my_LisaConfigFrame->Hide();
-         my_LisaConfigFrame->Close();
-         delete my_LisaConfigFrame; my_LisaConfigFrame=NULL;
-         close_all_terminals();
-       }
-    Destroy();
-    */
+    if (!confirm_quit_while_powered())
+    {
+        event.Veto(); // user cancelled: keep the window (and the running Lisa) open
+        return;
+    }
     wxCommandEvent foo;
     OnQuit(foo);
 }
@@ -3216,6 +3238,12 @@ bool LisaEmApp::OnInit()
 {
     if (!wxApp::OnInit())
       return false; // call default behaviour (mandatory)
+
+#ifdef __WXOSX__
+    // macOS hides the file-type filter dropdown in Open dialogs by default; this makes wx show it
+    // (so the .dc42 / .image / All-files wildcard menu appears), matching Windows/GTK behaviour.
+    wxSystemOptions::SetOption(wxOSX_FILEDIALOG_ALWAYS_SHOW_TYPES, 1);
+#endif
 
     // Normally, if you type anything in the terminal window from where you
     // launched LisaEm, LisaEm will freeze and your only option is to restart it.
@@ -6055,8 +6083,8 @@ void LisaWin::OnPaint(wxPaintEvent& event )
 
     //  screen_paint_update++;
 
-    if (!my_lisaframe || !my_lisawin)
-      return; // not fully running yet, return so we don't crash
+    if (!my_lisaframe || !my_lisawin || !my_memDC)
+      return; // not fully running yet, or torn down during quit (OnQuit EXTERMINATEs my_memDC) - don't crash
 
     if (!my_lisaframe->running)
       repaintall |= REPAINT_INVALID_WINDOW;
@@ -7560,7 +7588,7 @@ void LisaEmFrame::OnConfig(wxCommandEvent& WXUNUSED(event))
     }
 #endif
 
-    my_LisaConfigFrame->Show();
+    my_LisaConfigFrame->ShowModal();
     ALERT_LOG(0, "JD - in void LisaEmFrame::OnConfig and my_LisaConfigFrame->Show")
 }
 
@@ -9442,6 +9470,9 @@ extern "C" void update_profile_preferences_path(char *newfilename) {
 
 
 // Connects a printer/profile to the specified VIA - 2021.08.24 added profile_prefs_path to save the preferences it came from.
+// reachable power-state check for other translation units (e.g. LisaConfigFrame.cpp, which can't see my_lisaframe)
+extern "C" int lisa_is_powered_on(void) { return (my_lisaframe && my_lisaframe->running) ? 1 : 0; }
+
 void connect_device_to_via(int v, wxString device, wxString *file, wxString profile_prefs_path)
 {
     char tmp[MAXPATHLEN];
@@ -9484,6 +9515,8 @@ void connect_device_to_via(int v, wxString device, wxString *file, wxString prof
       ALERT_LOG(0, "Attempting to attach VIA#%d to profile %s", v, tmp);
       if (!via[v].ProFile)
         via[v].ProFile = (ProFileType *)calloc(1, sizeof(ProFileType)); // valgrind reports leak here, but it's ok, just not freed before exit
+      else if ((&via[v].ProFile->DC42)->close_image)                    // re-attaching an already-mounted slot: close the old
+        (&via[v].ProFile->DC42)->close_image(&via[v].ProFile->DC42);    // image first, else dc42_open leaks its fd + MAP_SHARED mmap
 
       int i = profile_mount(tmp, via[v].ProFile);
       if (i)
@@ -10079,7 +10112,7 @@ int initialize_all_subsystems(void)
       // JD - Open the prefs window to set the ROM path
       EXTERMINATE(my_LisaConfigFrame);
       my_LisaConfigFrame = new LisaConfigFrame(wxT("Preferences"), my_lisaconfig);
-      my_LisaConfigFrame->Show();
+      my_LisaConfigFrame->ShowModal();
     }
     //JD - If we're here, then the ROM path wasn't set. I'd like to see this removed, though.
     //else
