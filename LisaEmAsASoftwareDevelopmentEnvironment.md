@@ -66,7 +66,7 @@ If you don't want to go through the trouble of dumping the ROMs from your Lisa C
 
    ![Lisa Office System Environments Selector)](./assets/screenshots/lisa_los_environments_selector_screen.png)
 
- - Here you can choose to boot into Lisa Office System or into the Workshop development environment. We want the latter: choose the check box next to "Workshop" and click the "Launch" button. You will be presented with the workshop main menu (a bunch of command across the top of the screen):
+ - Here you can choose to boot into Lisa Office System or into the Workshop development environment. We want the latter: choose the check box next to "Workshop" and click the "Start" button. You will be presented with the workshop main menu (a bunch of command across the top of the screen):
 
    ![Lisa Workshop Home Screen)](./assets/screenshots/lisa_workshop_home_screen.png)
 
@@ -93,9 +93,9 @@ Before getting into file transfers, it is useful to know how to test if the Pseu
 - One-time setup to turn off "handshake", because LisaEm does not support it: 
    - On the Lisa side, the upload uses a "macro" text file in Lisa Workshop named ALEX/TRANSFER.TEXT. We need to modify it to turn off "handshake". It's better to make a copy first: run LisaEm and boot into Workshop. Choose "F" (file manager), then "C" (copy), then follow the prompts to copy file ALEX/TRANSFER.TEXT into file ALEX/TRANSFER_NO_HANDSHAKE.TEXT (or choose a simpler name if you fancy it). Then "Q" (quit) the file manager, "E" (edit) to launch the editor, where it will ask you which file you want to edit. Enter ALEX/TRANSFER_NO_HANDSHAKE.TEXT, it will open it for edit. The file looks like this: https://github.com/alexthecat123/LisaSourceCompilation/blob/main/src/ALEX-TRANSFER.TEXT . You will need to change part of the text on Line 3 from `1{DTR Output Handshake}` to `0{No Output Handshake}`, and then part of the text on Line 4 from `1{DTR Input Handshake}` to `0{No Input Handshake}`, and then figure out how to save it and exit the editor. Why is this needed: the Pseudo TTY communication does not support DTR (Data Terminal Ready) handshake, so we are turning it off. 
 
-   - On your Linux PC, we'll use Alex's `lisa_serial_transfer.py` program, you can find it at https://github.com/arcanebyte/lisaem/tree/master/src/tools/python/lisa_serial_transfer.py, and download it to e.g. folder `/tmp` . Make sure you have Python 3.x installed. Also, install the "pyserial" library: `pip3 install pyserial`.
+- On your Linux PC, we'll use Alex's `lisa_serial_transfer.py` program, you can find it at https://github.com/arcanebyte/lisaem/tree/master/src/tools/python/lisa_serial_transfer.py, and download it to e.g. folder `/tmp` . Make sure you have Python 3.x installed. Also, install the "pyserial" library: `pip3 install pyserial`.
 
-- Launch the file transfer utility on the Lisa: In the main Workshop menu, type "R" (run) and type `<ALEX/TRANSFER_NO_HANDSHAKE` (note the "<" in front, it tells to Workshop "run this file as a macro", more on macro-s later on). Enter to launch it. The screen will turn blank. What happened: Lisa moved the main console (similar to stdin/stdout in Linux) to Serial Port B. Now you have full control over that serial port (you can see try that with `picocom /tmp/b` on the Linux host, but let's move on with file upload).
+- Launch the file transfer utility on the Lisa: in the main Workshop menu, type "R" (run) and type `<ALEX/TRANSFER_NO_HANDSHAKE` (note the "<" in front, it tells to Workshop "run this file as a macro", more on macro-s later on). Enter to launch it. The screen will turn blank. What happened: Lisa moved the main console (similar to stdin/stdout in Linux) to Serial Port B. Now you have full control over that serial port (you can see try that with `picocom /tmp/b` on the Linux host, but let's move on with file upload).
 
 - Copy/paste/save the sample "hello world" Pascal program below into a file `/tmp/HELLO_WORLD.TEXT` on your Linux PC. 
 
@@ -172,7 +172,7 @@ Yes, it goes like this:
 
 During normal upload, you will see activity on the LisaEm screen, e.g. lines like `Processed line 100 of file ...`. If LisaEm no-longer prints anything during the upload, then it has hung. This is a known bug that happens intermittently during long/large file uploads. Possible workarounds:
 - Close and restart LisaEm and restart the file upload, hoping for a better outcome.
-- Add e.g. `--throttle_tx_millis 2` to the ``python3 lisa_serial_transfer.py` command line. This will add a 2 milliseconds "sleep" time after sending each byte, which may help.
+- Add e.g. `--throttle_tx_millis 2` to the `python3 lisa_serial_transfer.py` command line. This will add a 2 milliseconds "sleep" time after sending each byte, which may help.
 - If transferring multiple files, transfer just the remaining files (that are "not there yet"). If transferring the Lisa Office System sources, try to upload each individual subfolder separately, e.g "APPS/APBG", then "APPS/APCL", etc. 
 - Download the LisaEm sources from this GitHub repository, edit file `src/lisa/io_board/z8530.c`, and increase the value of `#define SCC_MIN_CYCLES_BETWEEN_READS ....` to e.g. twice-as-much, recompile (./build.sh clean build), start LisaEm from there ('./bin/lisaem') and try again. This slows down the transfer, but makes it more reliable.
 
@@ -184,7 +184,7 @@ For full disclosure, as of mid-2026, we are aware of a bug where the Lisa Worksh
 
 ## Did you use, or are you using AI to develop LisaEm?
 
-Software developers are turning into AI Assistants, and are bitter about it, understandably; so using AI is a sensitive topic. We try to clearly state, in each github "pull request", if AI was used, and for what. As of mid-2026, I, the author of this article, have used AI to hunt and fix an elusive memory leak (turns out it was in `mmu.c`), and to get help with some basic stuff, like "why compilation fails on MacOS only". For sure, Ray (the original LisaEm author) did not use AI, because it wasn't invented yet.
+Software developers are turning into AI Assistants, and are bitter about it, understandably; so using AI is a sensitive topic. We try to clearly state, in each github "pull request", if AI was used, and for what. As of mid-2026, I, the author of this article, use AI as a "helper", not as a "coder": e.g.: I have used AI to hunt and fix an elusive memory leak (turns out it was in `mmu.c`), to get help with some basic stuff, like "why compilation fails on MacOS only", or "explain this piece of code". For sure, Ray (the original LisaEm author) did not use AI, because it wasn't invented yet.
 
 ## Where can I find Lisa softwares online?
 
