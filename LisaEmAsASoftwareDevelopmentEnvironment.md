@@ -94,7 +94,7 @@ Before getting into file transfers, it is useful to know how to test if the Pseu
 - One-time setup to turn off "handshake", because LisaEm does not support it: 
    - On the Lisa side, the upload uses a "macro" text file in Lisa Workshop named ALEX/TRANSFER.TEXT. We need to modify it to turn off "handshake". It's better to make a copy first: Launch LisaEm and boot into Workshop. Choose "F" (file manager), then "C" (copy), then follow the prompts to copy file ALEX/TRANSFER.TEXT into file ALEX/TRANSFER_NO_HANDSHAKE.TEXT (or choose a simpler name if you fancy it). Then "Q" (quit) the file manager, "E" (edit) to launch the editor, where it will ask you which file you want to edit. Enter ALEX/TRANSFER_NO_HANDSHAKE.TEXT, it will open it for edit. The file looks like this: https://github.com/alexthecat123/LisaSourceCompilation/blob/main/src/ALEX-TRANSFER.TEXT . You will need to change part of the text on Line 3 from `1{DTR Output Handshake}` to `0{No Output Handshake}`, and then part of the text on Line 4 from `1{DTR Input Handshake}` to `0{No Input Handshake}`, and then figure out how to save it and exit the editor. Why is this needed: the Pseudo TTY communication does not support DTR (Data Terminal Ready) handshake, so we are turning it off. 
 
-   - On your Linux PC, we'll use a modified version of Alex's `lisa_serial_transfer.py` program, you can find it at https://github.com/arcanebyte/lisaem/tree/master/src/tools/python/lisa_serial_transfer.py, and download it to e.g. folder `/tmp` . Make sure you have Python 3.x installed. Open the file in an editor and remove the three "while not lisa_serial.dsr: ..." blocks of code, save and exit.
+   - On your Linux PC, we'll use Alex's `lisa_serial_transfer.py` program, you can find it at https://github.com/arcanebyte/lisaem/tree/master/src/tools/python/lisa_serial_transfer.py, and download it to e.g. folder `/tmp` . Make sure you have Python 3.x installed.
 
 - Launch the file transfer utility on the Lisa: In the main Workshop menu, type "R" (run) and type `<ALEX/TRANSFER_NO_HANDSHAKE` (note the "<" in front, it tells to Workshop "run this file as a macro", more on macro-s later on). Enter to launch it. The screen will turn blank. What happened: Lisa moved the main console (similar to stdin/stdout in Linux) to Serial Port B. Now you have full control over that serial port (you can see try that with `picocom /tmp/b` on the Linux host, but let's move on with file upload).
 
@@ -108,7 +108,7 @@ Before getting into file transfers, it is useful to know how to test if the Pseu
    END.
    ```
 
-- On your Linux PC run: `python3 /tmp/lisa_serial_transfer.py /tmp/b /tmp/HELLO_WORLD.TEXT`. Once prompted, hit Enter to start the transfer. It should take a second, and, upon success, Lisa should come back to the Workshop menu (actually will be in the "SYSTEM-MGR" submenu), with the text "Console moved to Main". Again on the Lisa, hit "q"(quit) to exit back to the main Workshop menu.
+- On your Linux PC run: `python3 /tmp/lisa_serial_transfer.py /tmp/b /tmp/HELLO_WORLD.TEXT --no_handshake`. Once prompted, hit Enter to start the transfer. It should take a second, and, upon success, Lisa should come back to the Workshop menu (actually will be in the "SYSTEM-MGR" submenu), with the text "Console moved to Main". Again on the Lisa, hit "q"(quit) to exit back to the main Workshop menu.
 
 - On the Lisa, verify that the file is there: "F" (file manager), L (list), type `HELLO_WORLD.TEXT`, enter. It should list and show you the file name, size, creation date, etc. 
 
@@ -164,8 +164,8 @@ Totally, it goes like this:
 - `cd ... folder-with-unzipped-files...`. There should be one sub-folder, named `Lisa_Source`.
 - Download Alex's https://github.com/alexthecat123/LisaSourceCompilation/blob/main/scripts/patch_files.py utility and run it: `python3 patch_files.py Lisa_Source` . It should print "Successfully applied 248/248 patches".
 - `cd Lisa_Source`
-- Run `<ALEX/TRANSFER_NO_HANDSHAKE` in Workshop in LisaEm; it starts waiting to receive files.
-- Run `python3 lisa_serial_transfer.py /tmp/b APPS` (this is the same modified utility that we used above, to transfer files). It will upload all (hundreds of) files in the "APPS" folder to the Lisa, e.g. it will save Linux file `APPS/APBG/apbg-BG.TEXT.unix.txt` into Lisa file `APBG/BG.TEXT` . It does all the necessary file renaming, and it also replaces all linux/windows new-lines (\r or \r\n) with Lisa new lines (\r).
+- Run `<ALEX/TRANSFER_NO_HANDSHAKE` in Workshop in LisaEm (we created this text "macro" file above); it starts waiting to receive files.
+- Run `python3 lisa_serial_transfer.py /tmp/b APPS --no_handshake` (this is the same utility that we used above, to transfer files). It will upload all (hundreds of) files in the "APPS" folder to the Lisa, e.g. it will save Linux file `APPS/APBG/apbg-BG.TEXT.unix.txt` into Lisa file `APBG/BG.TEXT` . It does all the necessary file renaming, and it also replaces all linux/windows new-lines (\r or \r\n) with Lisa new lines (\r).
 - Compile and link everything: run `<ALEX/MAKE/ALL_NODISKS` on the Lisa and give it some personal space. It should take just 15 minutes on a modern PC running LisaEm at 512MHZ. Upon success, you will arrive back to the Workshop main menu.
 - Check https://github.com/alexthecat123/LisaSourceCompilation for how to test/run the compiled code.
 
