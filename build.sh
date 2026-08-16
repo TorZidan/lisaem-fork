@@ -41,7 +41,7 @@ fi
     AUTHEMAIL="lisaem@arcanebyte.com"     # email address for this software
       COMPANY="Sunder.NET"                # company (vendor for sun pkg)
         CONAM="SUNDERNET"                 # company short name for Solaris pkgs
-          URL="https://lisaem.sunder.net" # url to website of package
+          URL="https://github.com/arcanebyte/lisaem" # url to website of package
 COPYRIGHTYEAR="2026"
 COPYRIGHTLINE="Copyright © ${COPYRIGHTYEAR} $AUTHOR,"
 LICENSERELEASE="Released under the terms of the GNU GPL v3.0"

@@ -195,10 +195,10 @@ ChannelType &   Alpha ()    Data Access: Access to individual colour components.
 */
 //-----------------------------------------------//
 
-// #define SETCOLOR(pi,val) {uint32 register v=(val>>24) 0xff; pi.Red()=v; pi.Blue()=MIN(v+EXTRABLUE,255); pi.Green()=v;}
+// #define SETCOLOR(pi,val) {uint32 v=(val>>24) 0xff; pi.Red()=v; pi.Blue()=MIN(v+EXTRABLUE,255); pi.Green()=v;}
 #define SETCOLOR(pi, val)                       \
     {                                           \
-        uint32 register v = (val >> 24) & 0xff; \
+        uint32 v = (val >> 24) & 0xff; \
         pi.Red() = v;                           \
         pi.Blue() = v + EXTRABLUE;              \
         pi.Green() = v;                         \

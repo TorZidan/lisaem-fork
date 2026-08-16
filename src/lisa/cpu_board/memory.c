@@ -47,6 +47,9 @@ extern uint32 getreg(uint8 regnum); // 16=pc, 17=sp 0=7Dregs 8-15Aregs;
 
 extern long getsectornum(DC42ImageType *F, uint8 side, uint8 track, uint8 sec);
 
+extern void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data);
+extern uint8 lisa_rb_Oxd200_sccz8530(uint32 address);
+
 int check_mmu0_chk(void);
 
 static int slot1h = 0, slot1l = 0;
@@ -2806,7 +2809,7 @@ uint8 *lisa_mptr_Oxd200_sccz8530(uint32 addr)
     return NULL;
 }
 
-// This lives in the zilog8530.c file so I just have a prototype in here...
+// lisa_rb_Oxd200_sccz8530 lives in the zilog8530.c file so I just have a prototype in here...
 
 uint16 lisa_rw_Oxd200_sccz8530(uint32 addr)
 {

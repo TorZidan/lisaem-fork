@@ -1,6 +1,6 @@
 # LisaEm - An Apple Lisa Emulator
+[![Build (Ubuntu 24.04)](https://github.com/arcanebyte/lisaem/actions/workflows/build-linux.yml/badge.svg?branch=master)](https://github.com/arcanebyte/lisaem/actions/workflows/build-linux.yml)
 
-[![Build (Ubuntu 24.04)](https://github.com/arcanebyte/lisaem/actions/workflows/workflow.yaml/badge.svg?branch=master)](https://github.com/arcanebyte/lisaem/actions/workflows/workflow.yaml)
 
 Copyright © 1998-2022 by Ray Arachelian, All Rights Reserved.  
 Copyright © 2023-2026 by Friends of Ray Arachelian.  
@@ -25,6 +25,11 @@ LisaEm is a emulator that runs on a wide variety of modern and somewhat old syst
 Many of the original ideas of the modern GUI, including copy and paste, were first envisioned in the Apple Lisa, so it's a historically very important machine. The seeds of these ideas were first found in the Xerox Alto, but the Lisa took them to their next logical step.
 
 This document contains a few brief updates that are also found in the ChangeLog file, as well as some information on how to compile wxWidgets and LisaEm.
+
+## Using LisaEm as a Lisa Software Development Environment:
+
+This deserves its own [page](LisaEmAsASoftwareDevelopmentEnvironment.md).
+
 
 ## Command Line Options
 

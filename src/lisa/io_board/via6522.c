@@ -787,7 +787,22 @@ int check_contrast_set(void)
 {
     if ((via[2].via[DDRB] & 0x84) == 0x84 && (via[2].via[ORBB] & 0x4) == 4 && via[2].via[DDRA] != 0) // this is OK (DDRA used with port B!)
     {
-        contrast = via[2].via[DDRA] & via[2].via[ORAA];
+        uint8 new_contrast = via[2].via[DDRA] & via[2].via[ORAA];
+        // LOS and Workshop dims the screen contrast after a period of inactivity, 
+        // which is annoying at high throttle speeds, as it happens almost instantly once the user stops typing or moving the mouse.
+        // if the "Display -> Disable Screen Dimming" menu option is set,
+        // don't let the screen contrast decrease (dim) beyond the normal brightness of 0x78.
+        // (but allow initial-boot contrast values of 0x80 and 0xff to pass through).
+        if (disable_screen_dimming 
+            && contrast != 0x00 && contrast != 0xff
+            && new_contrast != 0xff && new_contrast > 0x78) 
+        {
+            // do nothing, keep the current contrast value.
+        } else 
+        {
+            contrast = new_contrast;
+        }     
+
         videoramdirty |= 9;
         //      ALERT_LOG(0,"Setting Contrast:%02x",contrast);
         if (contrast == 0xff)
@@ -795,7 +810,7 @@ int check_contrast_set(void)
         else
             enable_vidram();
 
-        contrastchange(); // force UI to adjust display
+        contrastchange(); // force UI to adjust the display contrast to the new value.
         return 1;
     }
 

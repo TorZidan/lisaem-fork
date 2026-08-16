@@ -22,7 +22,7 @@
 
 // icon - is static, must be loaded in the .h
 #if !defined(__WXMSW__) && !defined(__WXOSX__)
-#include "../resources/lisa2icon.xpm"
+#include "../../../resources/lisa2icon.xpm"
 #endif
 
 // sounds - these are linked into the binary on Win32/UNIX, and are .WAV files

@@ -627,7 +627,7 @@ enum
   ID_THROTTLE100,
   ID_THROTTLE128,
   ID_THROTTLE256,
-  ID_THROTTLEX,
+  ID_THROTTLE512,
 
   ID_ET100_75,
   ID_ET50_30,
@@ -660,6 +660,7 @@ enum
 
   ID_HIDE_HOST_MOUSE,
   ID_USE_MOUSE_SCALE,
+  ID_DISABLE_SCREEN_DIMMING,
 
   ID_VID_SKINS,
   ID_VID_SKINLESSCENTER,
@@ -806,10 +807,9 @@ public:
   void OnThrottle100(wxCommandEvent &event);
   void OnThrottle128(wxCommandEvent &event);
   void OnThrottle256(wxCommandEvent &event);
-
+  void OnThrottle512(wxCommandEvent &event);
 #ifdef DEBUG
   void OnThrottle1(wxCommandEvent &event);
-  void OnThrottle512(wxCommandEvent &event);
 #endif
 
   void OnET100_75(wxCommandEvent &event);
@@ -873,6 +873,7 @@ public:
   void OnFlushPrint(wxCommandEvent &event);
   void OnHideHostMouse(wxCommandEvent &event);
   void OnUseMouseScale(wxCommandEvent &event);
+  void OnDisableScreenDimming(wxCommandEvent &event);
 
   void OnFullScreen(wxCommandEvent &event);
 
@@ -998,7 +999,6 @@ EVT_MENU(ID_RAWKBBUF, LisaEmFrame::OnRAWKBBUF)
 
 #ifdef DEBUG
 EVT_MENU(ID_THROTTLE1, LisaEmFrame::OnThrottle1)
-EVT_MENU(ID_THROTTLEX, LisaEmFrame::OnThrottle512)
 #endif
 EVT_MENU(ID_THROTTLE5, LisaEmFrame::OnThrottle5)
 EVT_MENU(ID_THROTTLE8, LisaEmFrame::OnThrottle8)
@@ -1011,6 +1011,7 @@ EVT_MENU(ID_THROTTLE64, LisaEmFrame::OnThrottle64)
 EVT_MENU(ID_THROTTLE100, LisaEmFrame::OnThrottle100)
 EVT_MENU(ID_THROTTLE128, LisaEmFrame::OnThrottle128)
 EVT_MENU(ID_THROTTLE256, LisaEmFrame::OnThrottle256)
+EVT_MENU(ID_THROTTLE512, LisaEmFrame::OnThrottle512)
 
 EVT_MENU(ID_ET100_75, LisaEmFrame::OnET100_75)
 EVT_MENU(ID_ET50_30, LisaEmFrame::OnET50_30)
@@ -1063,6 +1064,7 @@ EVT_MENU(ID_FORCE_REFRESH, LisaEmFrame::OnForceRefresh)
 
 EVT_MENU(ID_HIDE_HOST_MOUSE, LisaEmFrame::OnHideHostMouse)
 EVT_MENU(ID_USE_MOUSE_SCALE, LisaEmFrame::OnUseMouseScale)
+EVT_MENU(ID_DISABLE_SCREEN_DIMMING, LisaEmFrame::OnDisableScreenDimming)
 
 EVT_MENU(ID_PAUSE, LisaEmFrame::OnPause)
 
@@ -2065,6 +2067,11 @@ void LisaEmFrame::OnEmulationTimer(wxTimerEvent& event)
     }
     barrier = 1;
 
+    // Process any pending UI events.
+    // This ensures menus, dialogs and other UI interactions remain responsive
+    // even when the lisaem process is running at high CPU load.
+    wxTheApp->Yield(false);
+
     onidle_calls++;
 
     if (on_start_poweron && onidle_calls > 5)
@@ -2907,6 +2914,13 @@ void LisaEmFrame::OnUseMouseScale(wxCommandEvent& WXUNUSED(event))
     update_menu_checkmarks();
     ALERT_LOG(0, "use_mouse_scale:%d", use_mouse_scale);}
 
+void LisaEmFrame::OnDisableScreenDimming(wxCommandEvent &WXUNUSED(event))
+{
+    ::disable_screen_dimming = !::disable_screen_dimming;
+    save_global_prefs();
+    update_menu_checkmarks();
+    ALERT_LOG(0, "disable_screen_dimming:%d", ::disable_screen_dimming);}
+
 extern "C" long get_wx_millis(void) {
     return my_lisaframe->runtime.Time();}
 
@@ -3053,7 +3067,7 @@ void set_hidpi_scale(void)
         ALERT_LOG(0, "opened mousescale.txt, reading.");
         while (!feof(fh))
         {
-          fscanf(fh, "%d,%f\n", &d, &f);
+          if (fscanf(fh, "%d,%f\n", &d, &f) != 2) break;
           switch (d)
           {
           case 25:
@@ -3170,6 +3184,7 @@ void save_global_prefs(void)
     myConfig->Write(_T("/hostrefreshrate"), (long)my_lisaframe->hostrefresh);
     myConfig->Write(_T("/forcerefresh"), (long)my_lisaframe->force_display_refresh);
     myConfig->Write(_T("/use_mouse_scale"), (long)my_lisaframe->use_mouse_scale);
+    myConfig->Write(_T("/disable_screen_dimming"), (long)::disable_screen_dimming);
     myConfig->Write(_T("/hidehostmouse"), (long)hide_host_mouse);
 
     my_lisawin->GetClientSize(&x, &y);
@@ -3430,6 +3445,7 @@ bool LisaEmApp::OnInit()
 #else
   my_lisaframe->use_mouse_scale = (int)myConfig->Read(_T("/use_mouse_scale"), (int)1);
 #endif
+    ::disable_screen_dimming = (uint8)myConfig->Read(_T("/disable_screen_dimming"), (long)(0));
 
     my_lisawin->repaintall = REPAINT_INVALID_WINDOW;
     my_lisaframe->Show(true); // Light it up
@@ -7451,7 +7467,7 @@ void LisaEmFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
 
     info.SetDescription(description);
     info.SetCopyright(_T("\xa9 2026 Friends of Ray Arachelian"));
-    info.SetWebSite(_T("https://lisaem.sunder.net"));
+    info.SetWebSite(_T("https://github.com/arcanebyte/lisaem"));
 
     info.AddDeveloper(_T("Ray Arachelian - Emulator"));
     info.AddDeveloper(_T("James Ponder - 68K core"));
@@ -7826,9 +7842,9 @@ Throttle_MENU(64);
 Throttle_MENU(100);
 Throttle_MENU(128);
 Throttle_MENU(256);
+Throttle_MENU(512);
 #ifdef DEBUG
 Throttle_MENU(1);
-Throttle_MENU(512);
 #endif
 
 extern "C" void messagebox(char *s, char *t)  // messagebox string of text, title
@@ -7887,6 +7903,7 @@ void update_menu_checkmarks(void)
         fileMenu->Check(ID_PAUSE, (my_lisaframe->running == emulation_paused));
         DisplayMenu->Check(ID_HIDE_HOST_MOUSE, !!hide_host_mouse);
         DisplayMenu->Check(ID_USE_MOUSE_SCALE, my_lisaframe->use_mouse_scale);
+        DisplayMenu->Check(ID_DISABLE_SCREEN_DIMMING, ::disable_screen_dimming);
 
 #ifndef __WXOSX__
         DisplayMenu->Check(ID_VID_FULLSCREEN, (my_lisaframe->IsFullScreen()));
@@ -7984,11 +8001,10 @@ void update_menu_checkmarks(void)
       }
 
 #ifdef DEBUG
-      throttleMenu->Check(ID_THROTTLEX, my_lisaframe->throttle == 512);
       throttleMenu->Check(ID_THROTTLE1, my_lisaframe->throttle == 1.0);
 #else
-    if (my_lisaframe->throttle > 256.0)
-      my_lisaframe->throttle = 256.0;
+    if (my_lisaframe->throttle > 512.0)
+      my_lisaframe->throttle = 512.0;
 #endif
 
       throttleMenu->Check(ID_THROTTLE5, my_lisaframe->throttle == 5.0);
@@ -8002,6 +8018,7 @@ void update_menu_checkmarks(void)
       throttleMenu->Check(ID_THROTTLE100, my_lisaframe->throttle == 100.0);
       throttleMenu->Check(ID_THROTTLE128, my_lisaframe->throttle == 128.0);
       throttleMenu->Check(ID_THROTTLE256, my_lisaframe->throttle == 256.0);
+      throttleMenu->Check(ID_THROTTLE512, my_lisaframe->throttle == 512.0);
 
       throttleMenu->Check(ID_ET100_75, emulation_time == 100 && emulation_tick == 75);
       throttleMenu->Check(ID_ET50_30, emulation_time == 50 && emulation_tick == 30);
@@ -8903,6 +8920,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
 
     DisplayMenu->AppendCheckItem(ID_HIDE_HOST_MOUSE, wxT("Hide Host Mouse Pointer"), wxT("Hides the host mouse pointer - may cause lag"));
     DisplayMenu->AppendCheckItem(ID_USE_MOUSE_SCALE, wxT("Use Mouse Scaling"), wxT("Enab;e/Disable this if mouse tracking doesn't work"));
+    DisplayMenu->AppendCheckItem(ID_DISABLE_SCREEN_DIMMING, wxT("Disable Screen Dimming"), wxT("Prevent the screen from dimming, as the LOS auto dimming is annoying at high emulation speeds"));
 
 #ifndef __WXOSX__
     DisplayMenu->AppendSeparator();
@@ -8923,9 +8941,7 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     throttleMenu->AppendRadioItem(ID_THROTTLE100, wxT("100 MHz"), wxT("100Mhz - For modern machines"));
     throttleMenu->AppendRadioItem(ID_THROTTLE128, wxT("128 MHz"), wxT("128Mhz - For modern machines"));
     throttleMenu->AppendRadioItem(ID_THROTTLE256, wxT("256 MHz"), wxT("256MHz - For modern machines"));
-#ifdef DEBUG
-    throttleMenu->AppendRadioItem(ID_THROTTLEX, wxT("512 Mhz"), wxT("Ludicrous Speed!"));
-#endif
+    throttleMenu->AppendRadioItem(ID_THROTTLE512, wxT("512 Mhz"), wxT("Ludicrous Speed!"));
 
     throttleMenu->AppendSeparator();
     throttleMenu->AppendRadioItem(ID_ET100_75, wxT("Higher 68000 Performance"), wxT("Normal 100/75ms duty timer - faster emulated CPU, less smooth animations"));

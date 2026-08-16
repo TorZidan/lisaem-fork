@@ -18,54 +18,18 @@
 *                                                                                      *
 *           You should have received a copy of the GNU General Public License          *
 *           along with this program;  if not, write to the Free Software               *
-*           Foundation, Inc., 59 Temple Place #330, Boston, MA 02111-1307, USA.        *
+*           Foundation, Inc., 59 Temple Place #330, Boston, MA 02111-1307, USA.      *
 *                                                                                      *
 *                   or visit: http://www.gnu.org/licenses/gpl.html                     *
 *                                                                                      *
 *                                                                                      *
-*  FLIFLO Queue Structures for various LisaEm usage. The name is a merging of FIFO     *
-*  and LIFO queues, and is implemented as a circular buffer. If you use push/pop, it   *
-*  acts as a LIFO or stack. If you use add/get, it acts as a FILE.                     *
-*                                                                                      *
-*  FIFO=a First In, First Out queue. LIFO=Last In, First Out (also known as a stack)   *
+*  FIFO Queue for LisaEm usage.                                                        *
+*  Data is added at the end and retrieved from the start (First In, First Out).        *
 *                                                                                      *
 \**************************************************************************************/
 
-// This sure would work better as a C++ class. :)  But we're not writing in C++, so there.
-// thththththpt!
-//
-// FIFO's are FIRST IN FIRST OUT i.e. circular buffers
-// LIFO's are LAST IN, FIRST OUT queues, i.e. stacks
-//
-// FLIFLO's are both.  You can add data at the end of the queue,
-// you can pop data off the end like a stack, or get it from the begining,
-// like a fifo.
-
 #define IN_FLIFLO_QUEUE_C
 #include <vars.h>
-
-// typedef struct
-//{
-//   uint32 size;     // this is the total size of entries in the queue
-//   uint8 *buffer;   // buffer calloc'ed with size
-//   uint32 start;    // start/end indeces for add/remove/push/pop
-//   uint32 end;
-// } FLIFLO_QUEUE_t;
-
-// todo - add item size here and move mouse to fliflo but need backwards compatibility with keyboard/serial
-
-// int fliflo_buff_is_full(FLIFLO_QUEUE_t *b);
-// int fliflo_buff_has_data(FLIFLO_QUEUE_t *b);
-// int fliflo_buff_is_empty(FLIFLO_QUEUE_t *b);
-// uint32 fliflo_buff_size(FLIFLO_QUEUE_t *b);
-// uint32 fliflo_buff_percent_full(FLIFLO_QUEUE_t *b);
-// int fliflo_buff_add(FLIFLO_QUEUE_t *b,uint8 data);
-// uint8 fliflo_buff_pop(FLIFLO_QUEUE_t *b);
-// uint8 fliflo_buff_get(FLIFLO_QUEUE_t *b);
-// uint8 fliflo_buff_peek(FLIFLO_QUEUE_t *b);
-// uint8 fliflo_buff_peek_end(FLIFLO_QUEUE_t *b);
-// int fliflo_buff_create(FLIFLO_QUEUE_t *b, uint32 size);
-// void fliflo_buff_destroy(FLIFLO_QUEUE_t *b);
 
 static inline int next_idx(FLIFLO_QUEUE_t *b, int index)
 {
@@ -74,17 +38,6 @@ static inline int next_idx(FLIFLO_QUEUE_t *b, int index)
   if (!b->size)
     return 0;
   return (index + 1) % b->size;
-}
-
-static inline int previous_idx(FLIFLO_QUEUE_t *b, int index)
-{
-  if (!b)
-    return 0;
-  if (!b->size)
-    return 0;
-  if (!index)
-    return b->size - 1;
-  return (index - 1) % b->size;
 }
 
 int fliflo_buff_is_full(FLIFLO_QUEUE_t *b)
@@ -222,21 +175,8 @@ void fliflo_dump(FILE *log, FLIFLO_QUEUE_t *b, char *s)
   fprintf(log, "\n\n");
 }
 
-uint8 fliflo_buff_pop(FLIFLO_QUEUE_t *b) // checked
-{
-  uint8 data;
-  if (!b)
-    return 0;
-  if (fliflo_buff_is_empty(b))
-    return 0;
-  if (!b->buffer)
-    return 0;
-  b->end = previous_idx(b, b->end);
-  data = b->buffer[b->end];
-  b->buffer[b->end] = 0;
-  return data;
-}
-
+// Removes a byte from the start of the buffer (FIFO/queue behavior).
+// It reads the value at start, clears it, then advances the start pointer forward.
 uint8 fliflo_buff_get(FLIFLO_QUEUE_t *b) // checked.
 {
   uint8 data;
@@ -285,24 +225,11 @@ uint8 fliflo_buff_peek(FLIFLO_QUEUE_t *b)
   return data;
 }
 
-uint8 fliflo_buff_peek_end(FLIFLO_QUEUE_t *b)
-{
-  uint8 data;
-  if (!b)
-    return 0;
-  if (fliflo_buff_is_empty(b))
-    return 0;
-  if (!b->buffer)
-    return 0;
-  data = b->buffer[previous_idx(b, b->end)];
-  return data;
-}
-
 int fliflo_buff_create(FLIFLO_QUEUE_t *b, uint32 size)
 {
   if (!b)
     return -2;
-  if (size < 2)
+  if (!size)
     return -3;
   size++;
   b->buffer = calloc(1, size);
@@ -327,141 +254,3 @@ void fliflo_buff_destroy(FLIFLO_QUEUE_t *b)
   b->buffer = NULL;
 }
 
-#ifdef NEWCODE
-
-/* give a size value, find the next bitmask that contains this size.
-I.e give it 2 returns 3, give it 4,5,6 reurns 7, etc. So can use val &
-mask instead of modulo division.)  */
-
-uint32 findfittingbitmask(uint32 size)
-{
-  uint32 count = 0;
-  while (size >>= 1)
-    count++;
-  return (1 << (count + 1)) - 1;
-  // check the need for +1 above
-}
-
-// S=start pointer. E=end pointer.
-
-#define s (RB->start)
-#define e (RB->end)
-#define size (RB->rbsize)
-#define data (RB->data)
-#define CHKRB    \
-  {              \
-    if (!RB)     \
-      return -2; \
-  }
-
-inline static int rb_is_empty(RB)
-{
-  CHKRB;
-  return (s == e);
-}
-inline static int rb_is_full(RB)
-{
-  CHKRB;
-  return (next(e) == s);
-}
-inline static int rb_has_data(RB)
-{
-  CHKRB;
-  return (s != e);
-}
-inline static int rb_size(RB)
-{
-  CHKRB;
-  if (e >= s)
-    return e - s;
-  return (RB->buffersize - (s - e));
-}
-
-inline static rb_remaining_space(RB)
-{
-  return RB->buffersize - rb_size(RB);
-}
-
-inline static int rb_percent_full(RB)
-{
-  if (!RB)
-    return 100;
-  return rb_size(RB) * 100 / RB->buffersize;
-}
-
-inline static int next(RB, int i)
-{
-  CHKRB;
-  i++;
-  if (i >= RB->buffersize)
-    return 0;
-  return i;
-}
-
-inline static prev next(RB, int i)
-{
-  CHKRB;
-  i--;
-  if (i < 0)
-    return RB->buffersize - 1;
-  return i;
-}
-
-int add(RB, void *x)
-{
-  CHKRB;
-  if (is_full(RB))
-    return -1;
-  data[prev(RB, e)] = x;
-  e = next(RB, e);
-  size++;
-  return 0;
-}
-
-void *get(RB)
-{
-  int sold;
-  CHKRB;
-  if (is_empty(RB))
-    return NULL;
-  sold = s;
-  s = next(RB, s);
-  return data[sold];
-}
-
-void *peek(RB)
-{
-  CHKRB;
-  if (is_empty(RB))
-    return NULL;
-  return data[s];
-}
-
-void *peek_end(RB)
-{
-  if (!RB || is_empty(RB))
-    return NULL;
-  return data[prev(RB, e)];
-}
-
-void *get_end(RB)
-{
-  CHKRB;
-  if (is_empty(RB))
-    return -1;
-  e = prev(RB, e);
-  return data[e];
-}
-
-int add_start(RB, void *x)
-{
-  int ps = prev(RB, s);
-  CHKRB;
-  if (is_full(RB) || ps == e)
-    return -1;
-  s = ps;
-  data[ps] = x;
-  return 0;
-}
-
-#endif

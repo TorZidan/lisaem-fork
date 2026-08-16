@@ -35,11 +35,11 @@
 *        The files usually have a ".image" file extension, but other extensions        *
 *        can be used as well.                                                          *
 *                                                                                      *
-*        There is no way to validate that a given file is indeed of this type.          *
+*        There is no way to validate that a given file is indeed of this type.         *
 *                                                                                      *
-*        A typical 5MB Profile hard disk image is of file size 5,176,320 bytes,        *
-*        which has 9,729 sectors (of size 512+20) bytes, and 492 unused bytes          *
-*        at the end (a file with 0 unused bytes would work just as good).              *
+*        A typical 5MB Profile hard disk image is of file size 5,175,296 bytes,        *
+*        which has 9,728 sectors (of size 512+20) bytes, and 0 unused bytes            *
+*        at the end.                                                                   *
 *                                                                                      *
 *        A lot of the code here has been adapted from libdc42.c.                       *
 *                                                                                      *
@@ -474,10 +474,14 @@ int raw_profile_image_open(DC42ImageType *F, char *filename, char *options)
 #endif
 
    F->size = filesizetotal;
-   F->numblocks = filesizetotal/(512+24); // number of sectors in the image; files often have some extra padding at the end, which is unused.
    F->datasize = 512; // we don't support other sizes
    F->sectorsize = 512;
    F->tagsize = 20; // each sector has a 20-byte tag; we don't support other sizes
+
+   // Number of sectors in the disk image; files may have some extra padding at the end, which is unused (we round down below).
+   // Among others, used in profile.c in get_profile_spare_table() to "tell" the Lisa the size of this hard drive.
+   F->numblocks = filesizetotal/(F->datasize + F->tagsize);
+
    F->datasizetotal = F->numblocks * F->sectorsize;
    F->tagsizetotal = F->numblocks * F->tagsize;
 

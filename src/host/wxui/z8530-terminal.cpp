@@ -825,7 +825,7 @@ void TerminalWxFrame::XModemSendBlock(void)
             data[xferWindowSize] = (uint8)((checksum & 0xff));
         }
     }
-    for (int i = 0; i < size; i++)
+    for (size_t i = 0; i < size; i++)
         xwriteport(buffer[i], portnum);
 }
 
