@@ -562,6 +562,8 @@ void flag_via_t1_irq(int i)
 *                                                                                   *
 *  This must be called whenever any event timer changes!                            *
 \***********************************************************************************/
+static int timer_event_mid_opcode = 0;
+
 void get_next_timer_event(void)
 {
     int i;
@@ -601,7 +603,29 @@ void get_next_timer_event(void)
             } // oops! it expired, but we missed it!
 
             if (via[i].ProFile)
+            {
                 VIAProfileLoop(i, via[i].ProFile, PROLOOP_EV_NUL);
+
+                // end of the drive's busy period, when it raises BSY (CA1)
+                if (via[i].ProFile->clock_e > cpu68k_clocks && cpu68k_clocks_stop > via[i].ProFile->clock_e)
+                {
+                    cpu68k_clocks_stop = via[i].ProFile->clock_e;
+                    next_expired_timer = CYCLE_TIMER_VIAn_CA1(i);
+                }
+            }
+
+            if (via[i].EtherBox)
+            {
+                // EtherBox transmit done, interrupt retry or receive poll; overdue events run right away
+                XTIMER e = etherbox_next_event(via[i].EtherBox);
+                if (e > 0 && e < cpu68k_clocks)
+                    e = cpu68k_clocks;
+                if (e > 0 && cpu68k_clocks_stop > e)
+                {
+                    cpu68k_clocks_stop = e;
+                    next_expired_timer = CYCLE_TIMER_VIAn_CA1(i);
+                }
+            }
 
 #ifdef DEBUG
             if (i < 3 || via[i].active)
@@ -674,7 +698,18 @@ void get_next_timer_event(void)
             }
 
             if (!!(via[i].via[IER] & via[i].via[IFR]))
-                reg68k_external_autovector(via[i].irqnum); // 2021.03.21 fire interrupt if IFR set to enabled bits
+            {
+                // From an I/O access (reset_video_timing) the CPU is in the
+                // middle of an instruction, and taking the interrupt here
+                // lets the instruction's length be added to the vector
+                // address (seen when 0xFCE01A is read with a COPS interrupt
+                // pending). End the time slice instead so the pending
+                // interrupt is taken after the instruction.
+                if (timer_event_mid_opcode)
+                    cpu68k_clocks_stop = cpu68k_clocks;
+                else
+                    reg68k_external_autovector(via[i].irqnum); // 2021.03.21 fire interrupt if IFR set to enabled bits
+            }
         }
 
     // non-VIA timers - if they're due in this cycle, then see if they're smaller than the current min
@@ -767,10 +802,12 @@ void reset_video_timing(void)
     }
     lastvideotimimgreset = cpu68k_clocks;
 
+    timer_event_mid_opcode = 1;
     get_next_timer_event();
     video_scan = cpu68k_clocks; // keep track of where we are
     virq_start = cpu68k_clocks + FULL_FRAME_CYCLES;
     get_next_timer_event();
+    timer_event_mid_opcode = 0;
 }
 
 void decisecond_clk_tick(void)
@@ -1104,6 +1141,20 @@ void check_current_timer_irq(void)
     // Handle VIA related timers from this point on
     if (!V)
         return; // if we have an erroneous timer, return;
+
+    /// ProFile busy period over ///////////////////////////////////////////////////////////////////////////////////////////////////
+    if ((next_expired_timer & 0xe0) == 0x20)
+    {
+        DEBUG_LOG(0, "Handling ProFile busy period on via %d", i);
+        if (V->ProFile)
+            VIAProfileLoop(i, V->ProFile, PROLOOP_EV_NUL);
+        if (V->EtherBox)
+            etherbox_timer(V->EtherBox);
+
+        next_expired_timer = 0;
+        get_next_timer_event();
+        return;
+    }
 
     /// Shift register events //////////////////////////////////////////////////////////////////////////////////////////////////////
     if (next_expired_timer & 0x40) // shift register

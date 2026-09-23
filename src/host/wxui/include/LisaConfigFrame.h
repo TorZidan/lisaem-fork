@@ -86,7 +86,6 @@ public:
     wxRadioBox *cpurambox;
 
     wxCheckBox *cheats;       // startup BOOT ROM cheats
-    wxCheckBox *hle_cheats;   // ProFile acceleration
     wxCheckBox *console_term; // Display TerminalWx for LPW + UniPlus (and eventually Xenix)
                               // wxCheckBox *macwx4mb;
     wxCheckBox *soundeffects;
@@ -114,7 +113,7 @@ public:
     wxCheckBox *serialalimit;
     wxCheckBox *serialblimit;
 
-    wxString pportopts[3];  // common to all parallel ports
+    wxString pportopts[4];  // common to all parallel ports; the 4th, EtherBox, only on dual parallel card ports
     wxString wpportopts[3]; // Widget on Lisa 2/10
 
     wxString nothingonly[2];
