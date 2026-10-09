@@ -193,6 +193,27 @@ static int crdy_toggle = 0;
 // for speed, but remember to copy them here.  Could turn them into macros, but...
 
 // pass it the via[?].t?_e, get back the timer value (used to read t1/t2)
+// LISAEM_T2LOG: VIA2's T2, every 2 seconds of emulated time: how many
+// times it fired, was started (T2CH) and read, the counts it was started
+// with, and IFR and IER as they are.
+long t2log_fires, t2log_starts, t2log_reads;
+static long t2log_min = 0x10000, t2log_max = -1, t2log_zero;
+void t2log_tick(void)
+{
+    static int on = -1;
+    static XTIMER next = 0;
+    if (on < 0)
+        on = getenv("LISAEM_T2LOG") != NULL;
+    if (!on || cpu68k_clocks < next)
+        return;
+    next = cpu68k_clocks + 10000000;
+    fprintf(stderr, "T2LOG: fired %ld started %ld (counts %ld-%ld, %ld zero) read %ld IFR %02x IER %02x\n",
+            t2log_fires, t2log_starts, t2log_min, t2log_max, t2log_zero, t2log_reads, via[2].via[IFR], via[2].via[IER]);
+    t2log_fires = t2log_starts = t2log_reads = t2log_zero = 0;
+    t2log_min = 0x10000;
+    t2log_max = -1;
+}
+
 inline static XTIMER get_via_timer_left_from_te(XTIMER t_e)
 {
     // int32 diff=(t_e-cpu68k_clocks)/via_clock_diff;
@@ -213,6 +234,18 @@ inline static XTIMER get_via_timer_left_or_passed_from_te(XTIMER t_e, XTIMER tim
     if (passed < 0)
         return passed;
     return 0;
+}
+
+// T2's count as a 6522 reads it: the count loaded when T2CH was written
+// (t2_start, at t2_set_cpuclk), one less each VIA clock since, and on past
+// zero (the flag is set once at zero; the count wraps and keeps going). Code
+// that reads T2 late to see how long has passed, as a time manager may,
+// needs this after the timer has run out too. A later write to the low
+// latch (T2CL) waits for the next T2CH write, as on a 6522.
+inline static uint16 via_t2_count(viatype *V)
+{
+    XTIMER elapsed = CPUCLK_TO_VIACLK(cpu68k_clocks - V->t2_set_cpuclk);
+    return (uint16)(V->t2_start - elapsed);
 }
 
 inline static XTIMER get_via_te_from_timer(uint16 timer)
@@ -1452,11 +1485,10 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
 
     case T2CL1: // Set Timer 2 Low Latch
         DEBUG_LOG(0, "T2CL1");
-        via[1].via[T2LL] = xvalue; // Set t2 latch low
+        via[1].via[T2LL] = xvalue; // Set t2 latch low: the count runs on
         via[1].last_port = port;
 
         // #ifdef DEBUG
-        via[1].t2_set_cpuclk = cpu68k_clocks;
         DEBUG_LOG(0, "t2clk:%d (write takes effect on write to T2H) T2 set to expire at CPU clock:%llx time now is %llx which is %llx cycles from now",
                   ((via[1].via[T2LH] << 8) | via[1].via[T2CL]), via[1].t2_e, cpu68k_clocks, via[1].t2_e - cpu68k_clocks);
         // #endif
@@ -1477,6 +1509,7 @@ void lisa_wb_Oxdc00_cops_via1(uint32 addr, uint8 xvalue)
         via[1].t2_e = get_via_te_from_timer((via[1].via[T2LH] << 8) | via[1].via[T2CL]); // set timer expiration
         FIX_CLKSTOP_VIA_T2(1);                                                           // update cpu68k_clocks_stop if needed
         via[1].t2_set_cpuclk = cpu68k_clocks;                                            // timer was set right now (at this clock)
+        via[1].t2_start = (via[1].via[T2LH] << 8) | via[1].via[T2CL];                   // the count it started from
 
         DEBUG_LOG(0, "t2clk:%d T2 set to expire at CPU clock:%llx time now is %llx which is %llx cycles from now",
                   ((via[1].via[T2LH] << 8) | via[1].via[T2CL]), via[1].t2_e, cpu68k_clocks, via[1].t2_e - cpu68k_clocks);
@@ -1782,7 +1815,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
     case T2CL1: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL1 t2_e:%ld set at:%ld", via[1].t2_e, via[1].t2_set_cpuclk);
 
-        via[1].via[T2CL] = get_via_timer_left_or_passed_from_te(via[1].t2_e, via[1].t2_set_cpuclk) & 0xff;
+        via[1].via[T2CL] = via_t2_count(&via[1]) & 0xff;
         via[1].last_port = port;
 
         // via[1].via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
@@ -1792,7 +1825,7 @@ uint8 lisa_rb_Oxdc00_cops_via1(uint32 addr)
 
     case T2CH1:
         DEBUG_LOG(0, "T2CH1");
-        via[1].via[T2CH] = get_via_timer_left_or_passed_from_te(via[1].t2_e, via[1].t2_set_cpuclk) >> 8;
+        via[1].via[T2CH] = via_t2_count(&via[1]) >> 8;
         via[1].last_port = port;
         return via[1].via[T2CH];
 
@@ -2099,10 +2132,9 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
     case T2CL2: // Set Timer 2 Low Latch
         DEBUG_LOG(0, "T2CL2");
-        via[2].via[T2LL] = xvalue; // Set t2 latch low
+        via[2].via[T2LL] = xvalue; // Set t2 latch low: the count runs on
 
         // #ifdef DEBUG
-        via[2].t2_set_cpuclk = cpu68k_clocks;
         via[2].last_port = port;
         DEBUG_LOG(0, "t2clk:%d (write takes effect on write to T2H) T2 set to expire at clock:%llx time now is %llx which is %llx cycles from now",
                   ((via[2].via[T2LH] << 8) | via[2].via[T2CL]), via[2].t2_e, cpu68k_clocks, via[2].t2_e - cpu68k_clocks);
@@ -2123,8 +2155,17 @@ void lisa_wb_Oxd800_par_via2(uint32 addr, uint8 xvalue)
 
         via[2].t2_e = get_via_te_from_timer((via[2].via[T2CH] << 8) | via[2].via[T2CL]); // set timer expiration
         DEBUG_LOG(0, "via[2].t2_e=%ld", via[2].t2_e);
+        {
+            long c = (via[2].via[T2CH] << 8) | via[2].via[T2CL];
+            t2log_starts++;
+            if (c < t2log_min) t2log_min = c;
+            if (c > t2log_max) t2log_max = c;
+            if (!c) t2log_zero++;
+            t2log_tick();
+        }
         FIX_CLKSTOP_VIA_T2(2);                // update cpu68k_clocks_stop if needed
         via[2].t2_set_cpuclk = cpu68k_clocks; // timer was set right now (at this clock)
+        via[2].t2_start = (via[2].via[T2CH] << 8) | via[2].via[T2CL]; // the count it started from
 
         DEBUG_LOG(0, "t2clk:%d T2 set to expire at CPU clock:%llx time now is %llx which is %llx cycles from now.  stop is:%llx",
                   ((via[2].via[T2LH] << 8) | via[2].via[T2CL]), via[2].t2_e, cpu68k_clocks, via[2].t2_e - cpu68k_clocks, cpu68k_clocks_stop);
@@ -2512,8 +2553,9 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
     case T2CL2: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL2 t2_e:%ld set at:%ld", via[2].t2_e, via[2].t2_set_cpuclk);
+        t2log_reads++;
 
-        via[2].via[T2CL] = get_via_timer_left_or_passed_from_te(via[2].t2_e, via[2].t2_set_cpuclk) & 0xff;
+        via[2].via[T2CL] = via_t2_count(&via[2]) & 0xff;
         via[2].last_port = port;
 
         // via[2].via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
@@ -2523,7 +2565,7 @@ uint8 lisa_rb_Oxd800_par_via2(uint32 addr)
 
     case T2CH2:
         DEBUG_LOG(0, "T2CH2"); // return via[2].via[T2CH];
-        via[2].via[T2CH] = get_via_timer_left_or_passed_from_te(via[2].t2_e, via[2].t2_set_cpuclk) >> 8;
+        via[2].via[T2CH] = via_t2_count(&via[2]) >> 8;
         via[2].last_port = port;
         return via[2].via[T2CH];
 
@@ -2996,7 +3038,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
     case T2CL2: // Timer 2 Low Byte
         DEBUG_LOG(0, "read T2CL2 t2_e:%ld set at:%ld", V->t2_e, V->t2_set_cpuclk);
 
-        V->via[T2CL] = get_via_timer_left_or_passed_from_te(V->t2_e, V->t2_set_cpuclk) & 0xff;
+        V->via[T2CL] = via_t2_count(V) & 0xff;
         V->last_port = port;
 
         // V->via[IFR] &=0xDF;                                    // clear T2 Interrupt from IFR  (bit 5) */
@@ -3006,7 +3048,7 @@ uint8 lisa_rb_ext_2par_via(ViaType *V, uint32 addr)
 
     case T2CH2:
         DEBUG_LOG(0, "T2CH2"); // return V->via[T2CH];
-        V->via[T2CH] = get_via_timer_left_or_passed_from_te(V->t2_e, V->t2_set_cpuclk) >> 8;
+        V->via[T2CH] = via_t2_count(V) >> 8;
         V->last_port = port;
         return V->via[T2CH];
 
@@ -3317,7 +3359,6 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         // V->t2_set_cpuclk=cpu68k_clocks;                                            // timer was set right now (at this clock)
 
         // #ifdef DEBUG
-        V->t2_set_cpuclk = cpu68k_clocks;
         DEBUG_LOG(0, "t2clk:%d (write takes effect on write to T2H) T2 set to expire at clock:%llx time now is %llx which is %llx cycles from now",
                   ((V->via[T2LH] << 8) | V->via[T2CL]), V->t2_e, cpu68k_clocks, V->t2_e - cpu68k_clocks);
         // #endif
@@ -3339,6 +3380,7 @@ void lisa_wb_ext_2par_via(ViaType *V, uint32 addr, uint8 xvalue)
         DEBUG_LOG(0, "V->t2_e=%ld", V->t2_e);
         FIX_CLKSTOP_VIA_T2(2);            // update cpu68k_clocks_stop if needed
         V->t2_set_cpuclk = cpu68k_clocks; // timer was set right now (at this clock)
+        V->t2_start = (V->via[T2CH] << 8) | V->via[T2CL]; // the count it started from
 
         DEBUG_LOG(0, "t2clk:%d T2 set to expire at CPU clock:%llx time now is %llx which is %llx cycles from now.  stop is:%llx",
                   ((V->via[T2LH] << 8) | V->via[T2CL]), V->t2_e, cpu68k_clocks, V->t2_e - cpu68k_clocks, cpu68k_clocks_stop);
@@ -3640,6 +3682,7 @@ void init_vias(void)
         // #ifdef DEBUG
         via[i].t1_set_cpuclk = 0;
         via[i].t2_set_cpuclk = 0;
+        via[i].t2_start = 0;
         via[i].t1_fired_cpuclk = 0;
         via[i].t2_fired_cpuclk = 0;
         via[i].last_port = 0xff; // an invalid port number

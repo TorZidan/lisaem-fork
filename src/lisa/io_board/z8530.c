@@ -1047,6 +1047,23 @@ static inline void avoid_rom_scc_tests(void)
 
 // want to set scc_r[port].s.rr0.r.rx_char_available=HAS_DATA, scc_r[port].s.rr0.r.tx_buffer_empty=1, scc_r[port].s.rr0.r.dcd=1, scc_r[port].s.rr0.r.cts=1
 
+// The transmit delay (z8530_event, set when a byte is sent) has run out:
+// the transmit buffer is empty, which interrupts only a channel whose
+// transmit interrupts are on (WR1), with the master enable (WR9) set, as
+// TX_BUFF_EMPTY does when a byte is written. It used to flag channel B's
+// transmit interrupt (128) whatever the enables: a guest that sends with
+// transmit interrupts off never cleared it, and the CPU went round the
+// guest's SCC interrupt handler for good.
+void z8530_tx_done(void)
+{
+  if (!scc_w[0].s.wr9.r.MIE)
+    return;
+  if (scc_w[0].s.wr1.r.txintenable)
+    TX_BUFF_EMPTY(0)
+  else if (scc_w[1].s.wr1.r.txintenable)
+    TX_BUFF_EMPTY(1)
+}
+
 int get_scc_pending_irq(void)
 {
   // int data;
@@ -1786,7 +1803,12 @@ uint8 lisa_rb_Oxd200_sccz8530(uint32 address)
       scc_r[port].s.rr0.r.cts = get_cts(port);
       scc_r[port].s.rr0.r.break_abort = get_break(port);
       scc_r[port].s.rr0.r.sync_hunt = 0;
-      scc_r[port].s.rr0.r.tx_underrun_eom = (!scc_w[port].s.wr5.r.txenable);
+      // Tx Underrun/EOM is a latch: "Reset Tx Underrun/EOM" (WR0 $C0) clears it
+      // and the chip sets it when the transmitter runs out of data. Bytes here
+      // leave at once, so an empty buffer is an underrun. MacWorks Plus II's
+      // LocalTalk send resets it after a frame and spins at IPL 6 until it sets.
+      if (!scc_w[port].s.wr5.r.txenable || fliflo_buff_is_empty(&SCC_WRITE[port]))
+        scc_r[port].s.rr0.r.tx_underrun_eom = 1;
       scc_r[port].s.rr0.r.zero_count = 0;
       
       // sync hunt fakeout

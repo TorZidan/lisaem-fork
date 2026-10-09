@@ -615,6 +615,7 @@ void generate(FILE *o, int topnibble)
                     OUT("ERROR\n");
                     break;
                 }
+                OUT("  SR &= 0xA71F; /* the SR bits a 68000 has */\n");
                 ABORT_CHECK(o);                                // added since this opcode doesn't call eastore
                 OUT("  if (sr != SFLAG) {SR_CHANGE()};\n");    // RA20050407
                 OUT("  if (oim>IMASK)   {IRQMASKLOWER();}\n"); // RA20050411
@@ -1163,7 +1164,16 @@ void generate(FILE *o, int topnibble)
                     OUT("  SR = (SR & ~0xFF) | srcdata;\n");
                     break;
                 case sz_word:
-
+                    if ((iib->bits & 0x0200) == 0)
+                    {
+                        /* MOVE <ea>,CCR ($44C0): a word-sized operand of which the
+                           CCR takes the low five bits. It was defined as a byte,
+                           which from memory fetched the high byte -- the SR's
+                           system byte -- so the flags were lost. */
+                        ABORT_CHECK(o);
+                        OUT("  SR = (SR & ~0xFF) | (srcdata & 0x1F);\n");
+                        break;
+                    }
                     OUT("  if (!SFLAG)\n");
                     fprintf(o, "    {reg68k_internal_vector(V_PRIVILEGE, PC+%d,0);return;}\n",
                             (iib->wordlen) * 2);
@@ -1171,7 +1181,7 @@ void generate(FILE *o, int topnibble)
 
                     OUT("\n");
                     ABORT_CHECK(o); // added since this opcode doesn't call eastore
-                    OUT("  SR = srcdata;\n");
+                    OUT("  SR = srcdata & 0xA71F; /* the SR bits a 68000 has */\n");
                     break;
                 default:
                     OUT("ERROR size\n");
@@ -1986,7 +1996,7 @@ void generate(FILE *o, int topnibble)
 
                 OUT("  ADDRREG(7)+= 6;\n"); // fix stack
 
-                OUT("  SR = w1;\n");
+                OUT("  SR = w1 & 0xA71F; /* the SR bits a 68000 has */\n");
 
                 // OUT("  FV = fetchword(ADDRREG(7)+6);   // added by RA for format/vector word\n");  // not applicable to 68000
                 // OUT("  ADDRREG(7)+= 8;                 // \n\n");
@@ -2041,7 +2051,7 @@ void generate(FILE *o, int topnibble)
                 OUT("l1=fetchlong(ADDRREG(7)+2);");
                 ABORT_CHECK(o);
 
-                OUT("  SR = (SR & ~0xFF) | (w1 & 0xFF);\n");
+                OUT("  SR = (SR & ~0xFF) | (w1 & 0x1F); /* RTR restores five CCR bits */\n");
                 OUT("  PC = l1;\n");
                 OUT("  ADDRREG(7)+= 6;\n");
 
@@ -2128,7 +2138,7 @@ void generate(FILE *o, int topnibble)
             case i_DBcc:
                 GENDBG("");
                 /* special case where ipc holds the already PC-relative value */
-                fprintf(o, "  uint32 srcdata = ipc->src;\n");
+                fprintf(o, "  uint32 srcdata = ipc->src + (reg68k_pc & 0xff000000); /* branch target with the PC's high byte */\n");
                 generate_ea(o, iib, tp_dst, 1);
                 generate_eaval(o, iib, tp_dst);
                 generate_cc(o, iib);
@@ -2155,7 +2165,7 @@ void generate(FILE *o, int topnibble)
             case i_DBRA:
                 GENDBG("");
                 /* special case where ipc holds the already PC-relative value */
-                fprintf(o, "  uint32 srcdata = ipc->src;\n");
+                fprintf(o, "  uint32 srcdata = ipc->src + (reg68k_pc & 0xff000000); /* branch target with the PC's high byte */\n");
                 generate_ea(o, iib, tp_dst, 1);
                 generate_eaval(o, iib, tp_dst);
 
@@ -2179,7 +2189,7 @@ void generate(FILE *o, int topnibble)
             case i_Bcc: // the -8's are reminders that the base case takes 8 cycles -  // RA2005.05.09
                 GENDBG("");
                 /* special case where ipc holds the already PC-relative value */
-                OUT("  uint32 srcdata = ipc->src;\n");
+                OUT("  uint32 srcdata = ipc->src + (reg68k_pc & 0xff000000); /* branch target with the PC's high byte */\n");
                 generate_cc(o, iib);
                 OUT("\n");
                 OUT("  uint32 oldpc=PC;\n");
@@ -2214,7 +2224,7 @@ void generate(FILE *o, int topnibble)
             case i_BSR:
                 GENDBG("");
                 /* special case where ipc holds the already PC-relative value */
-                OUT("  uint32 srcdata = ipc->src;\n");
+                OUT("  uint32 srcdata = ipc->src + (reg68k_pc & 0xff000000); /* branch target with the PC's high byte */\n");
                 OUT("\n");
                 if (DEBUG_BRANCH)
                     fputs("  printf(\"BSR: 0x%X\\n\", PC);\n", o);
@@ -2633,20 +2643,30 @@ void generate_ea(FILE *o, t_iib *iib, t_type type, int update)
             break;
         case dt_AbsW:
         case dt_AbsL:
-        case dt_Pdis:
             if (type == tp_src)
                 fprintf(o, "  uint32 srcaddr = ipc->src;\n");
             else
                 fprintf(o, "  uint32 dstaddr = ipc->dst;\n");
             break;
+        /* PC-relative: ipc->src/dst was worked out when the instruction was
+           decoded, from its 24-bit address, and the decoded instruction is
+           shared by every PC that reaches it. A 68000's PC keeps all 32 bits
+           (Mac code runs at $A0xxxxxx-style addresses from flagged handles),
+           so add the high byte of the PC it is running at. */
+        case dt_Pdis:
+            if (type == tp_src)
+                fprintf(o, "  uint32 srcaddr = ipc->src + (reg68k_pc & 0xff000000);\n");
+            else
+                fprintf(o, "  uint32 dstaddr = ipc->dst + (reg68k_pc & 0xff000000);\n");
+            break;
         case dt_Pidx:
             if (type == tp_src)
             {
-                fprintf(o, "  uint32 srcaddr = idxval_src(ipc);\n");
+                fprintf(o, "  uint32 srcaddr = idxval_src(ipc) + (reg68k_pc & 0xff000000);\n");
             }
             else
             {
-                fprintf(o, "  uint32 dstaddr = idxval_dst(ipc);\n");
+                fprintf(o, "  uint32 dstaddr = idxval_dst(ipc) + (reg68k_pc & 0xff000000);\n");
             }
             break;
         case dt_ImmB:

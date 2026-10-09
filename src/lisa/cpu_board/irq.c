@@ -407,6 +407,8 @@ void flag_via_sr_irq(int i)
 
 } /// end of shift register irq code //////////////////////////////////////////////////////////////////////////////////////////
 
+extern void z8530_tx_done(void);
+
 void flag_via_t2_irq(int i)
 {
     viatype *V = (i < 9 && i > 0) ? &via[i] : NULL;
@@ -425,6 +427,13 @@ void flag_via_t2_irq(int i)
     V->t2_e = -1;
     V->via[IFR] |= VIA_IRQ_BIT_T2; //  Set the IRQ flag for the VIA
     V->t2_fired++;
+    {
+        extern long t2log_fires;
+        extern void t2log_tick(void);
+        if (i == 2)
+            t2log_fires++;
+        t2log_tick();
+    }
 #ifdef DEBUG
     latch = (V->via[T2CH] << 8) | (V->via[T2CL]);
     rate = (latch ? ((cpu68k_clocks - V->t1_set_cpuclk) / latch) : 0);
@@ -1135,7 +1144,7 @@ void check_current_timer_irq(void)
     {
         DEBUG_LOG(0, "[zilog8530.c:]Count Zero Interrupt");
         z8530_event = -1;
-        z8530_last_irq_status_bits = 128;
+        z8530_tx_done();
     }
 
     // Handle VIA related timers from this point on

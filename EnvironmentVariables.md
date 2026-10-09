@@ -9,12 +9,22 @@ guest. All are off unless set.
 | Variable | Effect |
 |---|---|
 | `LISAEM_NO_DIALOGS` | Message boxes are not shown; each is answered with its default button (OK or Yes; No with `wxNO_DEFAULT`; Cancel with `wxCANCEL_DEFAULT`). Set to `0` to turn it off again. Every message box is also logged to stderr as `LisaEm dialog: [title] text`, whether or not this is set. Not covered: `wxMessageDialog` in the Preferences window, and file dialogs. |
-| `LISAEM_SCREEN_DUMP=<file.png>` | About once a second, the Lisa display (720x364) is saved to the file, written as `<file>.png.tmp` and renamed. |
+| `LISAEM_SCREEN_DUMP=<file.png>` | About once a second, the Lisa display (720x364, or 608x431 with the 3A ROM's XL screen) is saved to the file, written as `<file>.png.tmp` and renamed. |
 | `LISAEM_KEYBOARD_FILE=<file>` | About five times a second, bytes appended to the file are typed on the Lisa keyboard through the Edit/Paste-to-keyboard path. Newline is Return. `^A` followed by a byte B sends B to the COPS as a raw key code (bit 7 set for key down), so a script can hold a key down. If the file shrinks it is read again from the start. |
 | `LISAEM_MOUSE_MOVE_AT=<seconds>` | Once, that many seconds after start, does what moving the pointer onto the Lisa screen does. |
+| `LISAEM_MOUSE_FILE=<file>` | Mouse commands appended to the file, one a line, are carried out: `move X Y`, `click X Y`, `dclick X Y`, `down X Y`, `up X Y`, in Lisa screen pixels (720x364). One step (a move, a button change, or a pause so the guest sees the button held) runs every 100 ms, through the same queue as the host mouse, so a click happens where the pointer arrives. Commands already in the file at start are skipped; if it shrinks it is read again from the start. While it is set, the host mouse over the Lisa screen is ignored. |
 | `LISAEM_FLOPPY_AT=<seconds>,<image>` | Once, that many seconds after start, inserts the DC42 image in the floppy drive, as the menu's insert command does. Unlike `-f`, it does not restart from the floppy. |
+| `LISAEM_RAM_DUMP=<file>` | When `<file>.req` exists (checked about once a second), logical `$000000`-`$1FFFFF` as seen through MMU context 1 is saved to `<file>` and `<file>.req` is removed, so a script can read memory when it chooses. The PC, D0-D7, A0-A7 and both VIAs' IFR and IER are logged to stderr with it. |
+| `LISAEM_ADDRERR_DUMP=<file>` | At the first 68000 address error, the same 2 MB is saved to `<file>` before the guest's error handling runs, and the faulting access, PC, context, registers and SR are logged to stderr. |
 
 Times are host time, counted from when LisaEm starts.
+
+## Logs
+
+| Variable | Effect |
+|---|---|
+| `LISAEM_TRAPLOG=<lo>-<hi>` | Hex A-line trap words: each trap in that range and the address it was called from is logged to stderr as `TRAPLOG: <trap> from <pc>`, once for each pair (up to 512). |
+| `LISAEM_T2LOG=1` | Every 2 seconds of emulated time, VIA2's Timer 2: how many times it fired, was started (T2CH written) and read, the smallest and largest counts it was started with and how many were zero, and VIA2's IFR and IER, as a `T2LOG:` line on stderr. |
 
 ## CPU trace
 
@@ -43,3 +53,24 @@ the current context. The file is flushed every 1024 lines and on every
 
 After changing `reg68k.c`, run `./build.sh clean` before `./build.sh
 build`, which does not rebuild libGenerator on its own.
+
+## CPU cross-check
+
+`LISAEM_CPU_CHECK=<lo>-<hi>[,<seconds>]` (hex PCs) runs every instruction
+whose PC is in that range on a second 68000 core as well, Musashi 4.60
+(kstenerud/Musashi 313ebf1, MIT licence, in `src/lib/musashi`), starting
+from LisaEm's registers and memory, and logs where the two disagree:
+registers, PC, SR and memory writes. With `<seconds>`, checking starts that
+many seconds of host time after start.
+
+- Condition codes an instruction sets are compared only where Generator
+  computed them (it skips flags that nothing reads).
+- Instructions that touch anything but RAM are skipped, as are F-line
+  traps (LisaEm's HLE), `STOP` and `RESET`.
+- The log goes to `LISAEM_CPU_CHECK_LOG=<file>`, else stderr: the first 60
+  disagreements, each with the registers before and after on both cores,
+  and a count every 10 seconds.
+
+`cpucheck.c` sits between `reg68k.c` and Musashi. When the check is off,
+the cost on the execution path is a few tests of static variables around
+each instruction.

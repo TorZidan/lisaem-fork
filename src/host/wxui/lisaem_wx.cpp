@@ -355,6 +355,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static int set_window_size_already = 0;
 
+static int on_start_mousetopmenu = 0;
 static int on_start_poweron = 0,
            on_start_fullscreen = 0,
            on_start_skin = 0,
@@ -363,6 +364,8 @@ static int on_start_poweron = 0,
            on_start_quit_on_poweroff = 0,
            box_x = -1, box_y = -1, box_xh = -1, box_yh = -1; // used for screengrab
 static double on_start_zoom = 0.0;
+int mouse_top_shows_menu_fullscreen = 1; // preference: does moving the mouse to the top edge
+                                          // reveal the menu bar while in fullscreen?
 
 wxString on_start_lisaconfig = "",
          on_start_floppy = "";
@@ -379,6 +382,7 @@ static const wxCmdLineEntryDesc cmdLineDesc[] =
         {wxCMD_LINE_OPTION, "f", "floppy", "boot from which floppy image ROMless only", wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_OPTIONAL},
         {wxCMD_LINE_SWITCH, "d", "drive", "boot from motherboard ProFile/Widget ROMless only", wxCMD_LINE_VAL_NONE, wxCMD_LINE_PARAM_OPTIONAL},
         {wxCMD_LINE_SWITCH, "F", "fullscreen", "fullscreen mode (-F- to turn off)", wxCMD_LINE_VAL_NONE, wxCMD_LINE_SWITCH_NEGATABLE | wxCMD_LINE_PARAM_OPTIONAL},
+        {wxCMD_LINE_SWITCH, "M", "no-topmenu", "disable mouse-to-top revealing the menu bar in fullscreen (-M- to force it on)", wxCMD_LINE_VAL_NONE, wxCMD_LINE_SWITCH_NEGATABLE | wxCMD_LINE_PARAM_OPTIONAL},
         {wxCMD_LINE_OPTION, "z", "zoom", "set zoom level (0.50, 0.75, 1.0, 1.25,... 3.0)",
 
          wxCMD_LINE_VAL_DOUBLE,
@@ -665,6 +669,7 @@ enum
 
   ID_VID_SKINS,
   ID_VID_SKINLESSCENTER,
+  ID_VID_MOUSETOPMENU,
   ID_VID_SKINSELECT,
 
   ID_VID_SCALED_SUB,
@@ -841,6 +846,7 @@ public:
   void OnSkins(wxCommandEvent &event);
   void OnSkinSelect(wxCommandEvent &event);
   void OnSkinlessCenter(wxCommandEvent &event);
+  void OnMouseTopMenu(wxCommandEvent &event);
 
   void OnRefresh60(wxCommandEvent &event);
   void OnRefresh30(wxCommandEvent &event);
@@ -1031,6 +1037,7 @@ EVT_MENU(ID_VID_2X3Y, LisaEmFrame::OnVideo2X3Y)
 
 EVT_MENU(ID_VID_SKINS, LisaEmFrame::OnSkins)
 EVT_MENU(ID_VID_SKINLESSCENTER, LisaEmFrame::OnSkinlessCenter)
+EVT_MENU(ID_VID_MOUSETOPMENU, LisaEmFrame::OnMouseTopMenu)
 
 EVT_MENU(ID_VID_SKINSELECT, LisaEmFrame::OnSkinSelect)
 
@@ -1803,8 +1810,9 @@ extern "C"  void dumpallscreenshot(void)
 #endif
 
 // LISAEM_SCREEN_DUMP=<file.png>: about once a second of host time, save the
-// Lisa's display (720x364, one bit per pixel, read from video RAM) to that
-// file, so a script can see the screen without a window capture. The file
+// Lisa's display (720x364, or 608x431 with the 3A ROM's XL screen; one bit
+// per pixel, read from video RAM) to that file, so a script can see the
+// screen without a window capture. The file
 // is written under a temporary name and renamed, so readers never see a
 // partial file.
 static void screen_dump_if_due(void)
@@ -1828,7 +1836,7 @@ static void screen_dump_if_due(void)
       return;
     last = now;
 
-    const int w = 720, h = 364, bytes_per_row = 90;
+    const int w = lisa_vid_size_x, h = lisa_vid_size_y, bytes_per_row = lisa_vid_size_xbytes;
     wxImage image(w, h, false);
     for (int y = 0; y < h; y++)
       for (int x = 0; x < w; x++)
@@ -1841,6 +1849,51 @@ static void screen_dump_if_due(void)
     wxString tmp = wxString(path) + _T(".tmp");
     if (image.SaveFile(tmp, wxBITMAP_TYPE_PNG))
       wxRenameFile(tmp, wxString(path), true);
+}
+
+// LISAEM_RAM_DUMP=<file>: when <file>.req exists, save logical
+// $000000-$1FFFFF as seen through MMU context 1 to <file> and remove
+// <file>.req, so a script can read memory at a moment it chooses, or render
+// a frame buffer the Lisa does not display. Checked about once a second, and
+// only on request: a dump every second stalled the boot ROM's ProFile load.
+static void ram_dump_if_due(void)
+{
+    static wxLongLong last = 0;
+    const char *r = getenv("LISAEM_RAM_DUMP");
+    if (r == NULL || *r == '\0' || !lisaram)
+      return;
+
+    wxLongLong now = wxGetLocalTimeMillis();
+    if (now - last < 1000)
+      return;
+    last = now;
+
+    char req[1100], rtmp[1100];
+    snprintf(req, sizeof(req), "%s.req", r);
+    snprintf(rtmp, sizeof(rtmp), "%s.tmp", r);
+    if (access(req, F_OK) != 0)
+      return;
+    static uint8 buf[0x200000];
+    for (uint32 x = 0; x < 0x200000; x++)
+      buf[x] = lisaram[((mmu_all[1][(x >> 17) & 0x7f].sor << 9) + (x & 0x1ffff)) & 0x1fffff];
+    FILE *f = fopen(rtmp, "wb");
+    if (f)
+    {
+      fwrite(buf, 1, sizeof(buf), f);
+      fclose(f);
+      rename(rtmp, r);
+    }
+    unlink(req);
+    // and where the 68000 is, for a hang a memory image cannot show
+    extern uint32 reg68k_pc;
+    extern uint32 *reg68k_regs;
+    fprintf(stderr, "LISAEM_RAM_DUMP: PC %06lx", (long)(reg68k_pc & 0xffffff));
+    for (int i = 0; i < 16; i++)
+      fprintf(stderr, " %c%d %08lx", i < 8 ? 'D' : 'A', i & 7, (long)reg68k_regs[i]);
+    // and the VIAs' interrupt flags and enables, for an interrupt that
+    // will not clear
+    fprintf(stderr, " VIA1 IFR %02x IER %02x VIA2 IFR %02x IER %02x\n",
+            via[1].via[IFR], via[1].via[IER], via[2].via[IFR], via[2].via[IER]);
 }
 
 // LISAEM_KEYBOARD_FILE=<file>: about five times a second of host time, look
@@ -1922,6 +1975,91 @@ static void mouse_move_if_due(void)
     fprintf(stderr, "LISAEM_MOUSE_MOVE_AT: moving the mouse\n");
     add_mouse_event(360, 182, 0);
     seek_mouse_event();
+}
+
+// LISAEM_MOUSE_FILE=<file>: a script appends mouse commands to the file,
+// one per line: "move X Y", "click X Y", "dclick X Y", "down X Y", "up X Y"
+// (screen pixels, 720x364). Commands already in the file at start are
+// skipped, and one step runs every 100 ms. Moves and the button go through
+// add_mouse_event(), as for the host mouse, so a click happens where the
+// pointer arrives. While the file is in use, the host mouse over the window
+// is ignored.
+static int mouse_file_active(void)
+{
+    const char *e = getenv("LISAEM_MOUSE_FILE");
+    return e != NULL && *e != '\0';
+}
+
+static void mouse_file_if_due(void)
+{
+    static int enabled = -1;
+    static char path[1024];
+    static long offset = 0;
+    static wxLongLong last = 0;
+    static char steps[16];   // pending steps: 'm' move, 'd' down, 'u' up, 'h' hold
+    static int nsteps = 0, x = 0, y = 0;
+
+    if (enabled < 0)
+    {
+      enabled = mouse_file_active();
+      if (enabled)
+      {
+        snprintf(path, sizeof(path), "%s", getenv("LISAEM_MOUSE_FILE"));
+        FILE *f = fopen(path, "rb"); // commands already in the file are old: skip them
+        if (f)
+        {
+          fseek(f, 0, SEEK_END);
+          offset = ftell(f);
+          fclose(f);
+        }
+      }
+    }
+    if (!enabled)
+      return;
+
+    wxLongLong now = wxGetLocalTimeMillis();
+    if (now - last < 100)
+      return;
+    last = now;
+
+    if (nsteps == 0)
+    {
+      FILE *f = fopen(path, "rb");
+      if (!f)
+        return;
+      fseek(f, 0, SEEK_END);
+      long size = ftell(f);
+      if (size < offset)
+        offset = 0;
+      char line[128];
+      fseek(f, offset, SEEK_SET);
+      if (size > offset && fgets(line, sizeof(line), f) && strchr(line, '\n'))
+      {
+        offset += strlen(line);
+        char cmd[16];
+        if (sscanf(line, "%15s %d %d", cmd, &x, &y) == 3)
+        {
+          // 'h' holds for one step so the guest sees the button state
+          const char *seq = !strcmp(cmd, "click") ? "mdhu" : !strcmp(cmd, "dclick") ? "mdhudhu" :
+                            !strcmp(cmd, "down") ? "md" : !strcmp(cmd, "up") ? "mu" : "m";
+          // steps run from the end of the array
+          nsteps = strlen(seq);
+          for (int i = 0; i < nsteps; i++)
+            steps[nsteps - 1 - i] = seq[i];
+          fprintf(stderr, "LISAEM_MOUSE_FILE: %s %d %d\n", cmd, x, y);
+        }
+      }
+      fclose(f);
+      if (nsteps == 0)
+        return;
+    }
+
+    char step = steps[--nsteps];
+    if (step != 'h')
+    {
+      add_mouse_event(x, y, step == 'd' ? 1 : step == 'u' ? -1 : 0);
+      seek_mouse_event();
+    }
 }
 
 // LISAEM_FLOPPY_AT=<seconds>,<image>: once, that many seconds of host time
@@ -2062,8 +2200,10 @@ void LisaEmFrame::Update_Status(long elapsed,long idleentry)
     }
 #endif
     screen_dump_if_due();
+    ram_dump_if_due();
     keyboard_file_if_due();
     mouse_move_if_due();
+    mouse_file_if_due();
     floppy_insert_if_due();
 
 }
@@ -2777,6 +2917,13 @@ void LisaEmFrame::OnSkinSelect(wxCommandEvent& WXUNUSED(event))
 }
 
 
+void LisaEmFrame::OnMouseTopMenu(wxCommandEvent& WXUNUSED(event))
+{
+    mouse_top_shows_menu_fullscreen = !mouse_top_shows_menu_fullscreen;
+    update_menu_checkmarks();
+    save_global_prefs();
+}
+
 void LisaEmFrame::OnSkinlessCenter(wxCommandEvent& WXUNUSED(event))
 {
     skinless_center = !skinless_center;
@@ -3340,6 +3487,7 @@ void save_global_prefs(void)
     myConfig->Write(_T("/displayskins"), skins_on_next_run);
     myConfig->Write(_T("/displaymode"), (long)lisa_ui_video_mode);
     myConfig->Write(_T("/centerskinless"), (long)skinless_center);
+    myConfig->Write(_T("/mousetopmenufullscreen"), (long)mouse_top_shows_menu_fullscreen);
 
     myConfig->Write(_T("/asciikeyboard"), (long)asciikeyboard);
     myConfig->Write(_T("/lisaconfigfile"), myconfigfile);
@@ -3467,6 +3615,11 @@ bool LisaEmApp::OnInit()
     skins_on_next_run = skins_on;
 
     skinless_center = (int)myConfig->Read(_T("/centerskinless"), (long)1);
+    mouse_top_shows_menu_fullscreen = (int)myConfig->Read(_T("/mousetopmenufullscreen"), (long)1);
+    if (on_start_mousetopmenu == wxCMD_SWITCH_ON)
+      mouse_top_shows_menu_fullscreen = 0; // -M: disable regardless of the saved preference
+    else if (on_start_mousetopmenu == wxCMD_SWITCH_OFF)
+      mouse_top_shows_menu_fullscreen = 1; // -M-: force it back on regardless of the saved preference
     if (on_start_center == wxCMD_SWITCH_ON)
     {
       skinless_center = 1;
@@ -3657,6 +3810,9 @@ bool LisaEmApp::OnInit()
     {
       wxCommandEvent foo;
       on_start_fullscreen = 0;
+      if (FullScreenCheckMenuItem)
+        FullScreenCheckMenuItem->Check(true); // OnFullScreen reads this checkbox as the target state;
+                                               // a real menu click auto-toggles it first, this synthetic call does not.
       my_lisaframe->OnFullScreen(foo);
       ALERT_LOG(0, "on_start_fullscreen or last state was fullscreen");
     }
@@ -3722,6 +3878,7 @@ bool LisaEmApp::OnCmdLineParsed(wxCmdLineParser& parser)
     on_start_poweron = parser.Found(wxT("p"));
     on_start_harddisk = parser.Found(wxT("d"));
     on_start_fullscreen = parser.FoundSwitch(wxT("F")); // negateable
+    on_start_mousetopmenu = parser.FoundSwitch(wxT("M")); // negateable
     on_start_skin = parser.FoundSwitch(wxT("s"));       // negateable
     on_start_quit_on_poweroff = parser.Found(wxT("q"));
 
@@ -7027,30 +7184,33 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
       on_startup_actions_done = 1;
     }
 
-#if (!defined(__WXOSX__)) && (!defined(SHOW_MENU_IN_FULLSCREEN))
-    if (!FullScreenCheckMenuItem)
-      return;
-    if (my_lisaframe->IsFullScreen() || FullScreenCheckMenuItem->IsChecked())
+#if !defined(__WXOSX__)
+    if (mouse_top_shows_menu_fullscreen)
     {
-      int menuline = _H(16);
-      if (pos.y < menuline && last_mouse_pos_y >= menuline)
-      { // this is retarded. ShowFullScreen works, but only once, need to turn it off if you want to enable menus, and that causes the window to flash.  :(
-        my_lisaframe->ShowFullScreen(false, 0);
-        my_lisaframe->Maximize(true);
-        // my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_NOBORDER);
-        //  2019.09.04 even worse, now I have to get out of full screen mode entirely to display the menu. grrrr. issue with lightdm/enlightenment?
-        // my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_NOBORDER | wxFULLSCREEN_NOCAPTION    );
-      }
-      else if (pos.y > menuline && last_mouse_pos_y <= menuline)
+      if (!FullScreenCheckMenuItem)
+        return;
+      if (my_lisaframe->IsFullScreen() || FullScreenCheckMenuItem->IsChecked())
       {
-        my_lisaframe->ShowFullScreen(false, wxFULLSCREEN_ALL);
-        my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_ALL);
-      }
+        int menuline = _H(16);
+        if (pos.y < menuline && last_mouse_pos_y >= menuline)
+        { // this is retarded. ShowFullScreen works, but only once, need to turn it off if you want to enable menus, and that causes the window to flash.  :(
+          my_lisaframe->ShowFullScreen(false, 0);
+          my_lisaframe->Maximize(true);
+          // my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_NOBORDER);
+          //  2019.09.04 even worse, now I have to get out of full screen mode entirely to display the menu. grrrr. issue with lightdm/enlightenment?
+          // my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_NOBORDER | wxFULLSCREEN_NOCAPTION    );
+        }
+        else if (pos.y > menuline && last_mouse_pos_y <= menuline)
+        {
+          my_lisaframe->ShowFullScreen(false, wxFULLSCREEN_ALL);
+          my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_ALL);
+        }
 
-      if (FullScreenCheckMenuItem->IsChecked() && !my_lisaframe->IsFullScreen() && pos.y > menuline)
-      {
-        my_lisaframe->ShowFullScreen(false, wxFULLSCREEN_ALL);
-        my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_ALL);
+        if (FullScreenCheckMenuItem->IsChecked() && !my_lisaframe->IsFullScreen() && pos.y > menuline)
+        {
+          my_lisaframe->ShowFullScreen(false, wxFULLSCREEN_ALL);
+          my_lisaframe->ShowFullScreen(true, wxFULLSCREEN_ALL);
+        }
       }
     }
 #endif
@@ -7447,12 +7607,13 @@ void LisaWin::OnMouseMove(wxMouseEvent &event)
           b = -1;
         if (event.LeftDown())
           b = 1;
-        add_mouse_event(x, y, b);
+        if (!mouse_file_active())
+          add_mouse_event(x, y, b);
       }
       seek_mouse_event();
 
       // double click hack  - fixme BUG BUG BUG - fixme - well timing bug, will not be fixed if 32Mhz is allowed
-      if (lu)
+      if (lu && !mouse_file_active())
       {
         if (now - lastup < 1500)
         {
@@ -8072,6 +8233,9 @@ void update_menu_checkmarks(void)
 
       DisplayMenu->Check(ID_VID_SKINS, !!skins_on);
       DisplayMenu->Check(ID_VID_SKINLESSCENTER, !!skinless_center);
+#ifndef __WXOSX__
+      DisplayMenu->Check(ID_VID_MOUSETOPMENU, !!mouse_top_shows_menu_fullscreen);
+#endif
 
       if (!!my_lisaframe)
       {
@@ -9082,6 +9246,9 @@ LisaEmFrame::LisaEmFrame(const wxString& title)
     DisplayMenu->AppendSeparator();
     DisplayMenu->AppendCheckItem(ID_VID_SKINS, wxT("Skin"), wxT("Turn skins on/off"));
     DisplayMenu->AppendCheckItem(ID_VID_SKINLESSCENTER, wxT("Center when skinless"), wxT("Center the display when skins are turned off"));
+#ifndef __WXOSX__
+    DisplayMenu->AppendCheckItem(ID_VID_MOUSETOPMENU, wxT("Mouse-to-top reveals menu in fullscreen"), wxT("Moving the mouse to the top edge exits fullscreen to show the menu bar; uncheck if this is triggered unintentionally on a small display"));
+#endif
     DisplayMenu->Append(ID_VID_SKINSELECT, wxT("Change Skin"), wxT("Skin Select"));
     DisplayMenu->AppendSeparator();
 
@@ -10451,7 +10618,9 @@ extern "C" void rename_rompath(char *rompath)
     if (!my_lisaconfig)
       return;
 
-    my_lisaconfig->rompath = wxString(rompath, wxConvLocal, 2048); // wxSTRING_MAXLEN);
+    // no length: with one, wxString converts that many bytes, past the end of the
+    // name, and the conversion fails on what follows, leaving the path empty.
+    my_lisaconfig->rompath = wxString(rompath, wxConvLocal);
     my_lisaconfig->Save(pConfig, floppy_ram);
 
     if (my_LisaConfigFrame)
