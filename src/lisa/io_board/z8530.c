@@ -234,7 +234,6 @@ void set_odd_parity(unsigned int port);
 void set_no_parity(unsigned int port);
 void set_bits_per_char(unsigned int port, uint8 bitsperchar);
 void set_stop_bits(unsigned int port, uint8 stopbits);
-int read_serial_port(unsigned int port);
 void write_serial_port(unsigned int port, char data);
 void scc_hardware_reset_port(unsigned int port);
 void scc_channel_reset_port(unsigned int port);
@@ -242,12 +241,6 @@ void initialize_scc(int actual);
 void lisa_wb_Oxd200_sccz8530(uint32 address, uint8 data);
 uint8 lisa_rb_Oxd200_sccz8530(uint32 address);
 void dump_scc(void);
-
-// char read_serial_port(unsigned int port); //(jamesdenton) This was declared twice (first in ~214)
-int read_serial_port_nothing(unsigned int port);
-int read_serial_port_imagewriter(unsigned int port);
-int read_serial_port_loopbackplug(unsigned int port);
-int read_serial_port_localport(unsigned int port);
 
 void write_serial_port_nothing(unsigned int port, char data);
 void write_serial_port_loopbackplug(unsigned int port, char data);
@@ -286,7 +279,6 @@ extern int read_serial_port_tty(unsigned int port);
 
 // void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
 void write_serial_port_terminal(unsigned int port, char data);
-int read_serial_port_terminal(unsigned int port);
 
 static inline void on_read_irq_handle(int port);
 
@@ -449,7 +441,6 @@ void scc_channel_reset_port(unsigned int port)
   scc_bits_per_char_mask[1] = 255;
 }
 
-extern int read_serial_port_terminal(unsigned int port);
 // extern void write_serial_port_terminal(int port, uint8 data); //(jamesdenton) type mismatch between uint8 and char; need to address this
 extern void write_serial_port_terminal(unsigned int port, char data);
 
@@ -646,7 +637,6 @@ void initialize_scc(int actual)
     scc_fn[0].set_no_parity = set_no_parity;             //   void (*set_no_parity)(unsigned int port);
     scc_fn[0].set_bits_per_char = set_bits_per_char;     //   void (*set_bits_per_char)(unsigned int port, uint8 bitsperchar);
     scc_fn[0].set_stop_bits = set_stop_bits;             //   void (*set_stop_bits)(unsigned int port,uint8 stopbits);
-    scc_fn[0].read_serial_port = read_serial_port;       //   char (*read_serial_port)(unsigned int port);
     scc_fn[0].read_port_if_ready = read_port_if_ready_nothing;
     scc_fn[0].write_serial_port = write_serial_port;             //   void (*write_serial_port)(unsigned int port, char data);
     scc_fn[0].scc_hardware_reset_port = scc_hardware_reset_port; //   void (*scc_hardware_reset_port)(unsigned int port);
@@ -666,7 +656,6 @@ void initialize_scc(int actual)
     scc_fn[1].set_no_parity = set_no_parity;
     scc_fn[1].set_bits_per_char = set_bits_per_char;
     scc_fn[1].set_stop_bits = set_stop_bits;
-    scc_fn[1].read_serial_port = read_serial_port;
     scc_fn[1].read_port_if_ready = read_port_if_ready_nothing;
     scc_fn[1].write_serial_port = write_serial_port;
     scc_fn[1].scc_hardware_reset_port = scc_hardware_reset_port;
@@ -695,17 +684,14 @@ void initialize_scc(int actual)
     switch (portkind[port])
     {
     case SCC_LOCALPORT:
-      scc_fn[port].read_serial_port = read_serial_port_localport;
       scc_fn[port].write_serial_port = write_serial_port_localport;
       break;
     case SCC_IMAGEWRITER_PS:
     case SCC_IMAGEWRITER_PCL:
     case SCC_IMAGEWRITER:
-      scc_fn[port].read_serial_port = read_serial_port_imagewriter;
       scc_fn[port].write_serial_port = write_serial_port_imagewriter;
       break;
     case SCC_LOOPBACKPLUG:
-      scc_fn[port].read_serial_port = read_serial_port_loopbackplug;
       scc_fn[port].write_serial_port = write_serial_port_loopbackplug;
       scc_fn[port].set_dtr = set_dtr_loopbackplug;
       scc_fn[port].set_rts = set_rts_loopbackplug;
@@ -717,21 +703,17 @@ void initialize_scc(int actual)
 
 #ifndef __MSVCRT__
     case SCC_SHELL:
-      scc_fn[port].read_serial_port = read_serial_port_shell;
       scc_fn[port].write_serial_port = write_serial_port_shell;
       scc_fn[port].read_port_if_ready = read_port_if_ready_shell;
       break;
 
     case SCC_PTY:
-      // "read_serial_port" is never invoked. TO DO: clean up this unused code:
-      //scc_fn[port].read_serial_port = read_serial_port_pty;
       scc_fn[port].write_serial_port = write_serial_port_pty;
       scc_fn[port].read_port_if_ready = read_port_if_ready_pty;
       scc_fn[port].set_dtr = set_dtr_pty;
       break;
 
     case SCC_TTY:
-      scc_fn[port].read_serial_port = read_serial_port_tty;
       scc_fn[port].write_serial_port = write_serial_port_tty;
       scc_fn[port].read_port_if_ready = read_port_if_ready_tty;
       scc_fn[port].set_baud_rate = set_port_baud_tty;
@@ -741,14 +723,12 @@ void initialize_scc(int actual)
     // fallthrough to default for unsupported on windows
 #endif
     case SCC_TERMINAL:
-      scc_fn[port].read_serial_port = read_serial_port_terminal;
       scc_fn[port].write_serial_port = write_serial_port_terminal;
       scc_fn[port].read_port_if_ready = read_port_if_ready_terminal;
       break;
 
     default: // fallthrough, includes SCC_NOTHING.
       // ALERT_LOG(0,"Not sure what to connect to this port");
-      scc_fn[port].read_serial_port = read_serial_port_nothing;
       scc_fn[port].write_serial_port = write_serial_port_nothing;
       scc_fn[port].read_port_if_ready = read_port_if_ready_nothing;
       break;
@@ -2253,74 +2233,6 @@ void set_stop_bits(unsigned int port, uint8 stopbits)
   return;
 } // 0=0 no stop bits,1=1 stop bit,2=1.5 stop bits,3=2 stop bits
 
-int read_serial_port_nothing(unsigned int port)
-{
-  UNUSED(port);
-  return -1;
-}
-int read_serial_port_imagewriter(unsigned int port)
-{
-  UNUSED(port);
-  return -1;
-}
-int read_serial_port_loopbackplug(unsigned int port)
-{
-  UNUSED(port);
-  return -1;
-} // this should never be called!
-int read_serial_port_localport(unsigned int port)
-{
-  // fgetc returns EOF (-1) at end-of-file, which is the "no data" sentinel.
-  if (port)
-  {
-    if (scc_a_port_F)
-      return fgetc(scc_a_port_F);
-    else
-      return -1;
-  }
-  else
-  {
-    if (scc_b_port_F)
-      return fgetc(scc_b_port_F);
-    else
-      return -1;
-  }
-  return -1;
-}
-
-int read_serial_port(unsigned int port) // generic handler
-{
-  ALERT_LOG(0, "r %p %p w %p %p", SCC_READ[0].buffer, &SCC_READ[1].buffer, SCC_WRITE[0].buffer, SCC_WRITE[1].buffer);
-  ALERT_LOG(0, "SRC:port:%d", port);
-  if (port)
-  {
-    if (serial_a == SCC_NOTHING)
-      return -1;
-    if (serial_a == SCC_IMAGEWRITER)
-      return -1;
-    if (serial_a == SCC_LOCALPORT)
-    {
-      if (scc_a_port_F)
-        return fgetc(scc_a_port_F);
-      else
-        return -1;
-    }
-  }
-  else
-  {
-    if (serial_b == SCC_NOTHING)
-      return -1;
-    if (serial_b == SCC_IMAGEWRITER)
-      return -1;
-    if (serial_b == SCC_LOCALPORT)
-    {
-      if (scc_b_port_F)
-        return fgetc(scc_b_port_F);
-    }
-  }
-  return -1;
-}
-
 void disconnect_serial(int port)
 {
   if (port != 0 && port != 1)
@@ -2340,7 +2252,6 @@ void disconnect_serial(int port)
     break;
   }
 
-  scc_fn[port].read_serial_port = NULL;
   scc_fn[port].write_serial_port = NULL;
   scc_fn[port].read_port_if_ready = NULL;
 
